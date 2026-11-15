@@ -120,7 +120,22 @@ test("maps values, normalizes locale numbers and dates, and retains ignored fiel
   assert.deepEqual(rows[0].additional, { extra_note: "keep" });
   assert.equal(normalizeNumber("(2,50)"), -2.5);
   assert.equal(normalizeNumber("ORDER-X"), null);
+  assert.equal(normalizeNumber("USD 1.234,56"), 1234.56);
   assert.equal(normalizeDate("2026-03-04"), "2026-03-04");
+  assert.equal(normalizeDate("2026/03/04"), "2026-03-04");
+});
+
+test("treats a positive jump from zero sales as a real gain without crashing", () => {
+  const insights = calculateInventoryInsights([
+    { reportType: "products", rows: [{ product: "Desk lamp", sku: "L-1", stockQuantity: 10 }] },
+    { reportType: "orders", rows: [
+      { product: "Desk lamp", sku: "L-1", quantity: 0, date: "2026-01-03" },
+      { product: "Desk lamp", sku: "L-1", quantity: 3, date: "2026-02-03" },
+    ] },
+  ]);
+  const lamp = insights.find((item) => item.sku === "L-1");
+  assert.equal(lamp.change, 1);
+  assert.ok(lamp.recommendation.toLowerCase().includes("stock") || lamp.recommendation.toLowerCase().includes("sales"));
 });
 
 test("detects duplicates, missing required values, empty columns, and data types", () => {

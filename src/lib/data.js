@@ -130,18 +130,20 @@ export async function parseUpload(file) {
 export function normalizeNumber(value) {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (value === null || value === undefined || String(value).trim() === "") return null;
-  let text = String(value).trim().replace(/[^\d,.\-+()]/g, "");
+
+  const text = String(value).trim().replace(/\u2212/g, "-").replace(/\s+/g, "").replace(/[^\d,\.\-+()eE]/g, "");
   const negativeParentheses = text.startsWith("(") && text.endsWith(")");
-  text = text.replace(/[()]/g, "");
-  const lastComma = text.lastIndexOf(",");
-  const lastDot = text.lastIndexOf(".");
-  if (lastComma > lastDot) {
-    text = text.replace(/\./g, "").replace(",", ".");
-  } else {
-    text = text.replace(/,/g, "");
-  }
-  if (!/\d/.test(text)) return null;
-  const result = Number(text);
+  const cleaned = text.replace(/[()]/g, "");
+  const lastComma = cleaned.lastIndexOf(",");
+  const lastDot = cleaned.lastIndexOf(".");
+  const trimmed = cleaned.replace(/[^\d,\.\-+eE]/g, "");
+  const decimalText = (() => {
+    if (lastComma > lastDot) return trimmed.replace(/\./g, "").replace(",", ".");
+    return trimmed.replace(/,/g, "");
+  })();
+
+  if (!/[\d]/.test(decimalText)) return null;
+  const result = Number(decimalText);
   if (!Number.isFinite(result)) return null;
   return negativeParentheses ? -Math.abs(result) : result;
 }
@@ -153,15 +155,33 @@ export function normalizeDate(value) {
     if (parsed) return `${parsed.y}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`;
   }
   if (value === null || value === undefined || String(value).trim() === "") return "";
+
   const source = String(value).trim();
-  const us = source.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
-  if (us) {
-    const [, first, second, rawYear] = us;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(source)) return source;
+  const yearFirstSlashMatch = source.match(/^(\d{4})[/.](\d{1,2})[/.](\d{1,2})$/);
+  if (yearFirstSlashMatch) {
+    const [, year, month, day] = yearFirstSlashMatch;
+    return `${year}-${String(Number(month)).padStart(2, "0")}-${String(Number(day)).padStart(2, "0")}`;
+  }
+
+  const monthNames = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
+  const monthNameMatch = source.match(/^([a-zA-Z]{3,9})\s+(\d{1,2}),?\s+(\d{4})$/);
+  if (monthNameMatch) {
+    const month = monthNames[monthNameMatch[1].slice(0, 3).toLowerCase()];
+    if (month) return `${monthNameMatch[3]}-${String(month).padStart(2, "0")}-${String(monthNameMatch[2]).padStart(2, "0")}`;
+  }
+
+  const slashMatch = source.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{2,4})$/);
+  if (slashMatch) {
+    const [, first, second, rawYear] = slashMatch;
     const year = rawYear.length === 2 ? `20${rawYear}` : rawYear;
-    const day = Number(first) > 12 ? first : second;
-    const month = Number(first) > 12 ? second : first;
+    const monthNumber = Number(first);
+    const dayNumber = Number(second);
+    const day = monthNumber > 12 ? monthNumber : dayNumber;
+    const month = monthNumber > 12 ? dayNumber : monthNumber;
     return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   }
+
   const parsed = new Date(source);
   return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
 }
@@ -362,7 +382,7 @@ export function calculateReturns(imports) {
 
 export function calculateInventoryInsights(imports) {
   const products = new Map();
-  const productKey = (row) => row.sku || row.product;
+  const productKey = (row) => String(row.sku || row.product || "").trim().toLowerCase();
   const getProduct = (row) => {
     const key = productKey(row);
     if (!key) return null;
@@ -395,7 +415,9 @@ export function calculateInventoryInsights(imports) {
     const months = [...product.monthlySales].sort(([first], [second]) => first.localeCompare(second));
     const latest = months.at(-1);
     const previous = months.at(-2);
-    const change = latest && previous && previous[1] > 0 ? (latest[1] - previous[1]) / previous[1] : null;
+    const change = latest && previous
+      ? (previous[1] === 0 ? (latest[1] > 0 ? 1 : 0) : (latest[1] - previous[1]) / previous[1])
+      : null;
     const latestThreeMonths = months.slice(-3);
     const averageMonthlyDemand = latestThreeMonths.length
       ? latestThreeMonths.reduce((total, [, units]) => total + units, 0) / latestThreeMonths.length
