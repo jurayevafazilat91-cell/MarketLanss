@@ -31,6 +31,8 @@ The generated CSV samples are in `public/samples/` and are downloadable from Hel
 npm run samples
 ```
 
+The Products page combines product/inventory imports with dated order history. It can show cards, rows, or a compact list; product details include weekly, monthly, and yearly unit sales, descriptions, offers, and popularity by yearly sales. Seller-edited stock is saved as a product-keyed override in the same local store (or MongoDB record) as imports. The product sample includes stock, descriptions, and sample promotions; demo order dates roll across the last year so each sales period can be explored.
+
 ## Import workflow
 
 Choose a report type, then select or drop a CSV, XLSX, or XLS file (up to 10 MB / 100,000 rows). Confirm the proposed column mappings; ambiguous amount columns are not mapped automatically. Review the preview and warnings, then import. Returns require an order ID and a return reason or customer-feedback column; customer details, marketplace reference, stock quantity, and conversation URL are optional. Rows with missing values and duplicates are retained, not silently discarded. Original row values and unmapped fields are retained with each standardized row.

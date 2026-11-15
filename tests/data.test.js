@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
   import {
     analyzeColumnTypes,
     calculateInventoryInsights,
+    calculateProductCatalog,
     calculatePaymentAudit,
   calculateReturns,
   categorizeReturn,
@@ -24,6 +25,13 @@ test("parses CSV with comma, semicolon, and tab delimiters", async () => {
     const parsed = await parseUpload({ name, size: text.length, text: async () => text });
     assert.deepEqual(parsed.rows, [{ order_id: "A-1", amount: "12.50" }]);
   }
+  const productText = await readFile(new URL("../public/samples/products_sample.csv", import.meta.url), "utf8");
+  const parsedProducts = await parseUpload({ name: "products_sample.csv", size: Buffer.byteLength(productText), text: async () => productText });
+  const mappings = Object.fromEntries(recognizeColumns(parsedProducts.headers).map(({ header, field }) => [header, field]));
+  const products = mapRows(parsedProducts.rows, mappings);
+  assert.equal(products.length, 6);
+  assert.ok(products.every((row) => row.product && Number.isFinite(row.stockQuantity) && row.description));
+  assert.ok(products.some((row) => row.discountPercent > 0 && row.promotion));
 });
 
 test("parses the first worksheet in an Excel workbook", async () => {
@@ -211,6 +219,31 @@ test("produces inventory recommendations only from imported stock and dated sale
   assert.equal(lamp.averageMonthlyDemand, 4.5);
   assert.match(mug.recommendation, /increased 100%/i);
   assert.equal(mug.stock, null);
+});
+
+test("builds product sales windows and applies saved stock overrides", () => {
+  const catalog = calculateProductCatalog([
+    { reportType: "products", rows: [
+      { product: "Bottle", sku: "B-1", unitPrice: 20, stockQuantity: 8, description: "Steel bottle", discountPercent: 10, promotion: "Launch offer" },
+    ] },
+    { reportType: "orders", rows: [
+      { product: "Bottle", sku: "B-1", quantity: 2, date: "2026-11-15" },
+      { product: "Bottle", sku: "B-1", quantity: 3, date: "2026-11-09" },
+      { product: "Bottle", sku: "B-1", quantity: 4, date: "2026-10-20" },
+      { product: "Bottle", sku: "B-1", quantity: 5, date: "2025-12-01" },
+      { product: "Bottle", sku: "B-1", quantity: 5, date: "2025-11-14" },
+      { product: "Bottle", sku: "B-1", quantity: 9, date: "2026-11-16" },
+    ] },
+  ], [{ key: "b-1", stockQuantity: 12 }], new Date("2026-11-15T12:00:00Z"));
+
+  assert.equal(catalog.length, 1);
+  assert.equal(catalog[0].sales.week, 5);
+  assert.equal(catalog[0].sales.month, 9);
+  assert.equal(catalog[0].sales.year, 14);
+  assert.equal(catalog[0].stock, 12);
+  assert.equal(catalog[0].description, "Steel bottle");
+  assert.equal(catalog[0].discountPercent, 10);
+  assert.equal(catalog[0].promotion, "Launch offer");
 });
 
 test("demo records are linked consistently and include intentional audit cases", () => {

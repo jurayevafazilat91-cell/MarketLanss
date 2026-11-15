@@ -23,6 +23,10 @@ const schema = z.object({
     isDemo: z.boolean().optional(),
     sourceHeaders: z.array(z.string().max(256)).max(1000).optional(),
   })).max(250),
+  stockOverrides: z.array(z.object({
+    key: z.string().max(256),
+    stockQuantity: z.number().int().min(0).max(100000000),
+  })).max(100000).default([]),
   language: z.enum(["en", "ru", "uz"]).default("en"),
 });
 
@@ -30,13 +34,15 @@ async function loadStore() {
   const collection = await getMongoStoreCollection();
   if (collection) {
     const saved = await collection.findOne({ _id: "main" });
-    return saved ? { imports: saved.imports, language: saved.language } : { imports: [], language: "en" };
+    return saved
+      ? { imports: saved.imports, stockOverrides: saved.stockOverrides ?? [], language: saved.language }
+      : { imports: [], stockOverrides: [], language: "en" };
   }
 
   try {
     return JSON.parse(await readFile(file, "utf8"));
   } catch (error) {
-    if (error.code === "ENOENT") return { imports: [], language: "en" };
+    if (error.code === "ENOENT") return { imports: [], stockOverrides: [], language: "en" };
     throw error;
   }
 }

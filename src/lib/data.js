@@ -40,6 +40,9 @@ export const fields = {
   marketplaceConversationUrl: "Marketplace conversation URL",
   marketplaceAccountUrl: "Marketplace account URL",
   stockQuantity: "Current stock",
+  description: "Product description",
+  discountPercent: "Discount percentage",
+  promotion: "Promotion",
   refund: "Refund amount",
   comment: "Customer comment",
 };
@@ -67,6 +70,9 @@ const aliases = {
   marketplaceConversationUrl: ["marketplaceconversationurl", "conversationurl", "conversationlink", "chaturl", "messagelink", "returnconversationurl"],
   marketplaceAccountUrl: ["marketplaceaccounturl", "customeraccounturl", "buyerprofileurl", "accounturl"],
   stockQuantity: ["stock", "stockquantity", "currentstock", "inventory", "inventoryquantity", "inventorylevel", "availablestock", "availablequantity", "availableunits", "stockonhand", "stocklevel", "quantityinstock", "onhand"],
+  description: ["description", "productdescription", "details", "productdetails"],
+  discountPercent: ["discount", "discountpercent", "discountpercentage", "salepercent"],
+  promotion: ["promotion", "promotionname", "promotionlabel", "offer", "deal"],
   refund: ["refund", "refundamount", "refundedamount"],
   comment: ["comment", "feedback", "customercomment", "review", "message"],
 };
@@ -203,10 +209,10 @@ export function mapRows(rows, mappings) {
         continue;
       }
       const value = row[header];
-      if (["quantity", "unitPrice", "amount", "fee", "refund"].includes(field)) result[field] = normalizeNumber(value);
+      if (["quantity", "unitPrice", "amount", "fee", "refund", "discountPercent"].includes(field)) result[field] = normalizeNumber(value);
       else if (field === "stockQuantity") result[field] = normalizeNumber(value);
       else if (field === "date") result.date = normalizeDate(value);
-      else if (["returnReason", "customerFeedback", "comment"].includes(field)) result[field] = value === null || value === undefined ? "" : String(value);
+      else if (["returnReason", "customerFeedback", "comment", "description", "promotion"].includes(field)) result[field] = value === null || value === undefined ? "" : String(value);
       else result[field] = value === null || value === undefined ? "" : String(value).trim();
     }
     if (result.transactionType) result.transactionType = normalizeTransactionType(result.transactionType);
@@ -449,6 +455,64 @@ export function calculateInventoryInsights(imports) {
     const priority = (item) => item.tone === "warning" ? 0 : item.tone === "success" ? 1 : 2;
     return priority(first) - priority(second) || (second.change ?? -Infinity) - (first.change ?? -Infinity);
   });
+}
+
+export function calculateProductCatalog(imports, stockOverrides = [], now = new Date()) {
+  const products = new Map();
+  const productKey = (row) => String(row.sku || row.product || "").trim().toLowerCase();
+  const getProduct = (row) => {
+    const key = productKey(row);
+    if (!key) return null;
+    if (!products.has(key)) products.set(key, {
+      key,
+      name: row.product || key,
+      sku: row.sku || "",
+      unitPrice: null,
+      stock: null,
+      description: "",
+      discountPercent: 0,
+      promotion: "",
+      sales: { week: 0, month: 0, year: 0 },
+    });
+    const product = products.get(key);
+    if (!product.name && row.product) product.name = row.product;
+    if (!product.sku && row.sku) product.sku = row.sku;
+    return product;
+  };
+
+  imports.filter((item) => item.reportType === "products").flatMap((item) => item.rows).forEach((row) => {
+    const product = getProduct(row);
+    if (!product) return;
+    if (Number.isFinite(row.unitPrice)) product.unitPrice = row.unitPrice;
+    if (Number.isFinite(row.stockQuantity)) product.stock = row.stockQuantity;
+    if (row.description) product.description = row.description;
+    if (Number.isFinite(row.discountPercent) && row.discountPercent >= 0 && row.discountPercent <= 100) {
+      product.discountPercent = row.discountPercent;
+    }
+    if (row.promotion) product.promotion = row.promotion;
+  });
+
+  const today = new Date(now).toISOString().slice(0, 10);
+  const todayTime = new Date(`${today}T00:00:00Z`).getTime();
+  imports.filter((item) => item.reportType === "orders").flatMap((item) => item.rows).forEach((row) => {
+    const product = getProduct(row);
+    if (!product) return;
+    if (!Number.isFinite(product.unitPrice) && Number.isFinite(row.unitPrice)) product.unitPrice = row.unitPrice;
+    if (!row.date || !/^\d{4}-\d{2}-\d{2}$/.test(row.date)) return;
+    const orderTime = new Date(`${row.date}T00:00:00Z`).getTime();
+    if (!Number.isFinite(orderTime) || orderTime > todayTime) return;
+    const daysAgo = Math.floor((todayTime - orderTime) / 86400000);
+    const units = Number.isFinite(row.quantity) ? Math.max(0, row.quantity) : 1;
+    if (daysAgo < 7) product.sales.week += units;
+    if (daysAgo < 30) product.sales.month += units;
+    if (daysAgo < 365) product.sales.year += units;
+  });
+
+  const overrides = new Map(stockOverrides.map((item) => [item.key, item.stockQuantity]));
+  return [...products.values()].map((product) => ({
+    ...product,
+    stock: overrides.has(product.key) ? overrides.get(product.key) : product.stock,
+  })).sort((first, second) => second.sales.year - first.sales.year || first.name.localeCompare(second.name));
 }
 
 export function escapeCsv(value) {

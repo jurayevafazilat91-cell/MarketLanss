@@ -7,6 +7,7 @@ const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
   const [imports, setImports] = useState([]);
+  const [stockOverrides, setStockOverrides] = useState([]);
   const [language, setLanguageState] = useState("en");
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
@@ -22,6 +23,7 @@ export function AppProvider({ children }) {
       .then((data) => {
         if (!active) return;
         setImports(Array.isArray(data.imports) ? data.imports : []);
+        setStockOverrides(Array.isArray(data.stockOverrides) ? data.stockOverrides : []);
         setLanguageState(["en", "ru", "uz"].includes(data.language) ? data.language : "en");
       })
       .catch((loadError) => {
@@ -33,18 +35,19 @@ export function AppProvider({ children }) {
     return () => { active = false; };
   }, []);
 
-  const save = useCallback(async (nextImports, nextLanguage = language) => {
+  const save = useCallback(async (nextImports, nextLanguage = language, nextStockOverrides = stockOverrides) => {
     const response = await fetch("/api/store", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imports: nextImports, language: nextLanguage }),
+      body: JSON.stringify({ imports: nextImports, stockOverrides: nextStockOverrides, language: nextLanguage }),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Could not save your data.");
     setImports(nextImports);
+    setStockOverrides(nextStockOverrides);
     setLanguageState(nextLanguage);
     setError("");
-  }, [language]);
+  }, [language, stockOverrides]);
 
   const setLanguage = useCallback(async (nextLanguage) => {
     try {
@@ -56,7 +59,7 @@ export function AppProvider({ children }) {
   }, [imports, save]);
 
   const value = useMemo(() => ({
-    imports, language, ready, error, toast,
+    imports, stockOverrides, language, ready, error, toast,
     t: (key) => translate(language, key),
     save,
     setLanguage,
@@ -65,7 +68,7 @@ export function AppProvider({ children }) {
       setToast(message);
       window.setTimeout(() => setToast(""), 3500);
     },
-  }), [imports, language, ready, error, toast, save, setLanguage]);
+  }), [imports, stockOverrides, language, ready, error, toast, save, setLanguage]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

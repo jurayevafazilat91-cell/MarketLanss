@@ -8,6 +8,7 @@ import { LoadingState } from "@/components/ui";
 
 const navigation = [
   { href: "/", key: "dashboardNav" },
+  { href: "/products", key: "catalog.productsNav" },
   { href: "/auditor", key: "financials" },
   { href: "/returns", key: "navReturns" },
   { href: "/history", key: "reports" },
@@ -29,7 +30,7 @@ function ShellContent({ children }) {
         </Link>
         <nav className="primary-navigation" aria-label="Main navigation">
           {navigation.map(({ href, key }) => (
-            <Link key={href} href={href} className={`top-nav-link ${pathname === href ? "top-nav-active" : ""}`}>{t(key)}</Link>
+            <Link key={href} href={href} className={`top-nav-link ${pathname === href || (href !== "/" && pathname.startsWith(`${href}/`)) ? "top-nav-active" : ""}`}>{t(key)}</Link>
           ))}
         </nav>
         <div className="navigation-tools">
