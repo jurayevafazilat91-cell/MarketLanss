@@ -53,10 +53,12 @@ export function Badge({ children, tone = "neutral" }) {
   return <span className={`badge badge-${tone}`}>{children}</span>;
 }
 
+// Cached per locale: CountUp formats on every animation frame.
+const moneyFormats = {};
 export function formatMoney(value, language = "en") {
-  return new Intl.NumberFormat(language === "uz" ? "uz-UZ" : language === "ru" ? "ru-RU" : "en-US", {
-    minimumFractionDigits: 2, maximumFractionDigits: 2,
-  }).format(value ?? 0);
+  const locale = language === "uz" ? "uz-UZ" : language === "ru" ? "ru-RU" : "en-US";
+  moneyFormats[locale] ??= new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return moneyFormats[locale].format(value ?? 0);
 }
 
 export function formatDate(value, language = "en") {
