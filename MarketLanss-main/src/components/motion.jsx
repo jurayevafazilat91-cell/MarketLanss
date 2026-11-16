@@ -17,9 +17,9 @@ const formatters = {
 };
 
 // Counts from the previously shown number to `value`. Server and reduced-motion output is the final number.
-export function CountUp({ value, kind = "integer", language }) {
+export function CountUp({ value, from = 0, kind = "integer", language }) {
   const ref = useRef(null);
-  const shown = useRef(0);
+  const shown = useRef(from);
   const reduce = useReducedMotion();
 
   // Layout effect + an immediate write, so the final number never flashes before the count starts.

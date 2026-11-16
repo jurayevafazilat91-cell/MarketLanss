@@ -295,8 +295,8 @@ code { font-size: .92em; }
 /* AI panel: fills the height of the left column on desktop, scrolls inside. */
 .ai-panel { position: absolute; inset: 0; display: flex; flex-direction: column; background: radial-gradient(80% 45% at 100% 0%, rgb(34 184 240 / calc(var(--glow-strength) * .28)), transparent 70%), var(--card-bg); }
 .ai-head { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; padding: 18px 20px 6px; }
-.ai-orb { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; background: conic-gradient(from 0deg, #3ddc97, #22b8f0, #8f73f2, #3ddc97); box-shadow: inset 0 0 10px rgb(255 255 255 / .35), 0 0 18px rgb(34 184 240 / .35); animation: orb-turn 9s linear infinite; }
-.ai-orb-busy { animation-duration: 1.6s; }
+.ai-orb { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; background: conic-gradient(from 0deg, #3ddc97, #22b8f0, #8f73f2, #3ddc97); box-shadow: inset 0 0 10px rgb(255 255 255 / .35), 0 0 18px rgb(34 184 240 / .35); }
+.ai-orb-busy { animation: orb-turn 1.6s linear infinite; }
 @keyframes orb-turn { to { transform: rotate(360deg); } }
 .ai-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
 .ai-head p { display: flex; align-items: center; gap: 6px; margin: 2px 0 0; color: var(--muted); font-size: 12px; }

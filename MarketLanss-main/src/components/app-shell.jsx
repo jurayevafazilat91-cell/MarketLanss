@@ -6,6 +6,7 @@ import { useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { Activity, CircleHelp, FileClock, Languages, LayoutGrid, Moon, Package, Settings, Undo2, Upload, Wallet } from "lucide-react";
 import { AppProvider, useApp } from "@/components/app-context";
+import { easeOut } from "@/components/motion";
 import { LoadingState } from "@/components/ui";
 
 const navigation = [
@@ -63,7 +64,7 @@ function ShellContent({ children }) {
             const active = isActive(pathname, href);
             return (
               <Link key={href} href={href} className={`side-link ${active ? "side-active" : ""}`} aria-current={active ? "page" : undefined}>
-                {active && <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: "spring", duration: 0.4, bounce: 0.15 }} />}
+                {active && <motion.span layoutId="nav-pill" className="nav-pill" style={{ borderRadius: 11 }} transition={{ type: "spring", duration: 0.4, bounce: 0.15 }} />}
                 <Icon size={17} aria-hidden="true" /><span className="side-label">{t(key)}</span>
               </Link>
             );
@@ -89,7 +90,7 @@ function ShellContent({ children }) {
       </div>
       <AnimatePresence>
         {toast && (
-          <motion.div className="toast" role="status" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}>
+          <motion.div className="toast" role="status" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} transition={{ duration: 0.22, ease: easeOut }}>
             {toast}
           </motion.div>
         )}

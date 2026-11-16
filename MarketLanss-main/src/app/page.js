@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -48,6 +48,9 @@ import { calculateInventoryInsights, calculatePaymentAudit, calculateReturns, la
 import { createDemoImports } from "@/lib/demo";
 import { formatUzbekDate, translateReport } from "@/lib/translations";
 
+// The intro plays once per page load; returning to the dashboard shows the numbers straight away.
+let introPlayed = false;
+
 const chartColors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "var(--chart-6)"];
 const transactionTypes = ["payment", "fee", "refund", "adjustment"];
 const compactNumber = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
@@ -88,6 +91,8 @@ function getMonthlyData(imports) {
 }
 
 export default function DashboardPage() {
+  const [intro] = useState(() => !introPlayed);
+  useEffect(() => { introPlayed = true; }, []);
   const { imports, t, language, save, notify } = useApp();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -192,7 +197,7 @@ export default function DashboardPage() {
       return (
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <Pie data={revenueMonths} dataKey="revenue" nameKey="month" innerRadius={66} outerRadius={110} paddingAngle={2}>
+            <Pie data={revenueMonths} dataKey="revenue" nameKey="month" innerRadius={66} outerRadius={110} paddingAngle={2} isAnimationActive={intro ? "auto" : false} animationBegin={150} animationDuration={700} animationEasing="ease-out">
               {revenueMonths.map((entry, index) => <Cell key={entry.month} fill={chartColors[index % chartColors.length]} />)}
             </Pie>
             {tooltip}
@@ -216,9 +221,9 @@ export default function DashboardPage() {
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={monthlyData} margin={{ top: 10, right: 4, bottom: 0, left: 0 }}>
             {axes}
-            <Bar dataKey="revenue" yAxisId="money" name={t("revenue")} fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="refunds" yAxisId="money" name={t("refunds")} fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="returns" yAxisId="count" name={t("returnsTotal")} fill="var(--chart-3)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="revenue" yAxisId="money" name={t("revenue")} fill="var(--chart-1)" radius={[4, 4, 0, 0]} isAnimationActive={intro ? "auto" : false} animationBegin={150} animationDuration={700} animationEasing="ease-out" />
+            <Bar dataKey="refunds" yAxisId="money" name={t("refunds")} fill="var(--chart-2)" radius={[4, 4, 0, 0]} isAnimationActive={intro ? "auto" : false} animationBegin={150} animationDuration={700} animationEasing="ease-out" />
+            <Bar dataKey="returns" yAxisId="count" name={t("returnsTotal")} fill="var(--chart-3)" radius={[4, 4, 0, 0]} isAnimationActive={intro ? "auto" : false} animationBegin={150} animationDuration={700} animationEasing="ease-out" />
           </BarChart>
         </ResponsiveContainer>
       );
@@ -237,9 +242,9 @@ export default function DashboardPage() {
             </linearGradient>
           </defs>
           {axes}
-          <Area type="linear" dataKey="refunds" yAxisId="money" name={t("refunds")} stroke="var(--chart-2)" strokeWidth={1.5} strokeOpacity={0.75} fill="url(#refundFill)" dot={false} animationDuration={900} />
-          <Area type="linear" dataKey="revenue" yAxisId="money" name={t("revenue")} stroke="var(--chart-1)" strokeWidth={2.25} fill="url(#revenueFill)" dot={{ r: 3, fill: "var(--chart-dot)", stroke: "var(--chart-1)", strokeWidth: 1.5 }} activeDot={{ r: 5, fill: "var(--chart-dot)", stroke: "var(--chart-1)", strokeWidth: 2 }} animationDuration={900} />
-          <Line type="linear" dataKey="returns" yAxisId="count" name={t("returnsTotal")} stroke="var(--chart-3)" strokeWidth={1.5} strokeDasharray="4 4" dot={false} animationDuration={900} />
+          <Area type="linear" dataKey="refunds" yAxisId="money" name={t("refunds")} stroke="var(--chart-2)" strokeWidth={1.5} strokeOpacity={0.75} fill="url(#refundFill)" dot={false} isAnimationActive={intro ? "auto" : false} animationBegin={150} animationDuration={700} animationEasing="ease-out" />
+          <Area type="linear" dataKey="revenue" yAxisId="money" name={t("revenue")} stroke="var(--chart-1)" strokeWidth={2.25} fill="url(#revenueFill)" dot={{ r: 3, fill: "var(--chart-dot)", stroke: "var(--chart-1)", strokeWidth: 1.5 }} activeDot={{ r: 5, fill: "var(--chart-dot)", stroke: "var(--chart-1)", strokeWidth: 2 }} isAnimationActive={intro ? "auto" : false} animationBegin={150} animationDuration={700} animationEasing="ease-out" />
+          <Line type="linear" dataKey="returns" yAxisId="count" name={t("returnsTotal")} stroke="var(--chart-3)" strokeWidth={1.5} strokeDasharray="4 4" dot={false} isAnimationActive={intro ? "auto" : false} animationBegin={150} animationDuration={700} animationEasing="ease-out" />
         </ComposedChart>
       </ResponsiveContainer>
     );
@@ -263,7 +268,7 @@ export default function DashboardPage() {
           <div className="page-actions"><Link href="/import" className="button button-primary"><FileUp size={15} />{t("importFirst")}</Link><Button variant="secondary" onClick={loadDemo}><ArrowDownToLine size={15} />{t("loadDemo")}</Button></div>
         } /></Card>
       ) : (
-        <motion.div variants={stagger} initial="hidden" animate="show">
+        <motion.div variants={stagger} initial={intro ? "hidden" : false} animate="show">
           <motion.div className="kpi-grid" variants={stagger}>
             {kpis.map(({ icon: Icon, ...kpi }) => {
               const up = kpi.change > 0;
@@ -272,7 +277,7 @@ export default function DashboardPage() {
                 <motion.article className="card kpi-card" style={{ "--glow": kpi.glow }} variants={rise} key={kpi.label}>
                   <span className="kpi-icon"><Icon size={16} aria-hidden="true" /></span>
                   <span className="kpi-label" title={kpi.note}><span>{kpi.label}</span><Info size={13} aria-hidden="true" /></span>
-                  <strong className="kpi-value">{kpi.value === null ? "—" : <CountUp value={kpi.value} kind={kpi.kind} language={language} />}</strong>
+                  <strong className="kpi-value">{kpi.value === null ? "—" : <CountUp value={kpi.value} from={intro ? 0 : kpi.value} kind={kpi.kind} language={language} />}</strong>
                   {kpi.change === null ? <span className="kpi-delta kpi-note">{kpi.note}</span> : (
                     <span className={`kpi-delta ${tone}`} title={t("vsPreviousMonth")}>
                       {kpi.change !== 0 && (up ? <ArrowUpRight size={14} aria-hidden="true" /> : <ArrowDownRight size={14} aria-hidden="true" />)}
@@ -337,9 +342,8 @@ export default function DashboardPage() {
                   {aiStatus === "missing" && <p className="ai-setup-note">{t("aiSetupHint")} <code>DEEPSEEK_API_KEY</code> {t("aiSetupHintEnd")}</p>}
                   {aiStatus === "unavailable" && <p className="ai-error" role="status">{t("aiStatusUnavailable")}</p>}
                   {aiError && <p className="ai-error" role="alert">{aiError}</p>}
-                  <AnimatePresence>
                     {analysis && (
-                      <motion.div className="ai-result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease: easeOut }}>
+                      <motion.div className="ai-result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: easeOut }}>
                         {analysis.recommendations.map((recommendation, index) => (
                           <article className="ai-recommendation" key={`${recommendation.title}-${index}`}>
                             <div><strong>{recommendation.title}</strong><Badge tone={recommendation.confidence === "high" ? "success" : "neutral"}>{t(`confidence${recommendation.confidence}`)}</Badge></div>
@@ -349,7 +353,6 @@ export default function DashboardPage() {
                         ))}
                       </motion.div>
                     )}
-                  </AnimatePresence>
                   <h3 className="ai-section-title"><span className="ai-ring" aria-hidden="true" />{t("inventoryAnalyst")}<Badge tone="blue">{t("dataDriven")}</Badge></h3>
                   {inventory.length ? (
                     <ul className="ai-points">

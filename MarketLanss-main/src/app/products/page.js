@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { easeOut } from "@/components/motion";
 import {
   AlignJustify,
   Boxes,
@@ -39,6 +40,20 @@ function ProductPrice({ product, language }) {
   );
 }
 
+const dialogMotion = {
+  initial: { opacity: 0, y: 16, scale: 0.97 },
+  animate: { opacity: 1, y: 0, scale: 1 },
+  exit: { opacity: 0, y: 10, scale: 0.98, transition: { duration: 0.16 } },
+  transition: { duration: 0.26, ease: easeOut },
+};
+const sheetEase = [0.32, 0.72, 0, 1];
+const sheetMotion = {
+  initial: { y: "100%" },
+  animate: { y: 0 },
+  exit: { y: "100%", transition: { duration: 0.25, ease: sheetEase } },
+  transition: { duration: 0.4, ease: sheetEase },
+};
+
 export default function ProductsPage() {
   const { imports, stockOverrides, language, t, save, notify } = useApp();
   const [view, setView] = useState("cards");
@@ -59,6 +74,8 @@ export default function ProductsPage() {
       : products;
   }, [products, search]);
   const selectedProduct = products.find((product) => product.key === selectedKey);
+  // Phones show the dialog as a bottom sheet, so it rises from the edge it is attached to. Only read after a click, never on the server.
+  const sheet = Boolean(selectedProduct) && window.matchMedia("(max-width: 680px)").matches;
 
   function openProduct(product) {
     setSelectedKey(product.key);
@@ -194,10 +211,7 @@ export default function ProductsPage() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="product-detail-title"
-            initial={{ opacity: 0, y: 16, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.98, transition: { duration: 0.16 } }}
-            transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
+            {...(sheet ? sheetMotion : dialogMotion)}
           >
             <div className="product-detail-heading">
               <div><span className="product-detail-icon"><Boxes size={19} /></span>
