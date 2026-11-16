@@ -46,7 +46,7 @@ import { CountUp, easeOut, rise, stagger } from "@/components/motion";
 import { Badge, Button, Card, EmptyState, ErrorMessage, formatDate, formatMoney } from "@/components/ui";
 import { calculateInventoryInsights, calculatePaymentAudit, calculateReturns, latestChange } from "@/lib/data";
 import { createDemoImports } from "@/lib/demo";
-import { translateReport } from "@/lib/translations";
+import { formatUzbekDate, translateReport } from "@/lib/translations";
 
 const chartColors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "var(--chart-6)"];
 const transactionTypes = ["payment", "fee", "refund", "adjustment"];
@@ -111,7 +111,7 @@ export default function DashboardPage() {
     .flatMap((item) => item.rows.map((row) => ({ ...row, _fileName: item.fileName })))
     .sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 5);
   const hasData = imports.some((item) => item.rows.length);
-  const today = new Intl.DateTimeFormat(language === "uz" ? "uz-UZ" : language === "ru" ? "ru-RU" : "en-US", { weekday: "long", day: "numeric", month: "short", year: "numeric" }).format(now);
+  const today = language === "uz" ? formatUzbekDate(now, { weekday: true }) : new Intl.DateTimeFormat(language === "ru" ? "ru-RU" : "en-US", { weekday: "long", day: "numeric", month: "short", year: "numeric" }).format(now);
   // Compare full months only: the month in progress would always look like a drop. ("Undated" sorts after any date, so it is excluded too.)
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const dated = monthlyData.filter((item) => item.month < currentMonth);

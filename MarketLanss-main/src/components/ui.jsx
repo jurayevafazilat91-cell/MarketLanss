@@ -1,6 +1,7 @@
 "use client";
 
 import { LoaderCircle } from "lucide-react";
+import { formatUzbekDate } from "@/lib/translations";
 
 export function Button({ children, variant = "primary", className = "", ...props }) {
   return (
@@ -62,7 +63,8 @@ export function formatDate(value, language = "en") {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(language === "uz" ? "uz-UZ" : language === "ru" ? "ru-RU" : "en-US", {
+  if (language === "uz") return formatUzbekDate(date);
+  return new Intl.DateTimeFormat(language === "ru" ? "ru-RU" : "en-US", {
     year: "numeric", month: "short", day: "numeric",
   }).format(date);
 }

@@ -411,3 +411,12 @@ export function translateField(t, field) {
 export function translateReport(t, type) {
   return t(`reportTypes.${type}`);
 }
+
+const uzMonths = ["yan", "fev", "mar", "apr", "may", "iyn", "iyl", "avg", "sen", "okt", "noy", "dek"];
+const uzWeekdays = ["yakshanba", "dushanba", "seshanba", "chorshanba", "payshanba", "juma", "shanba"];
+
+// Some browsers ship Uzbek without month names and print "2026 M11 16", so Uzbek dates are spelled out here.
+export function formatUzbekDate(date, { weekday = false } = {}) {
+  const text = `${date.getDate()}-${uzMonths[date.getMonth()]}, ${date.getFullYear()}`;
+  return weekday ? `${uzWeekdays[date.getDay()]}, ${text}` : text;
+}
