@@ -10,8 +10,8 @@ export function Button({ children, variant = "primary", className = "", ...props
   );
 }
 
-export function Card({ children, className = "" }) {
-  return <section className={`card ${className}`}>{children}</section>;
+export function Card({ children, className = "", ...props }) {
+  return <section className={`card ${className}`} {...props}>{children}</section>;
 }
 
 export function PageHeader({ title, description, actions }) {
