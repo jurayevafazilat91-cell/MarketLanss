@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   AlignJustify,
   Boxes,
@@ -183,11 +184,21 @@ export default function ProductsPage() {
         )}
       </Card>
 
+      <AnimatePresence>
       {selectedProduct && (
-        <div className="product-modal-backdrop" onMouseDown={(event) => {
+        <motion.div className="product-modal-backdrop" onMouseDown={(event) => {
           if (event.target === event.currentTarget) setSelectedKey("");
-        }}>
-          <section className="product-detail-modal" role="dialog" aria-modal="true" aria-labelledby="product-detail-title">
+        }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.16 } }} transition={{ duration: 0.2 }}>
+          <motion.section
+            className="product-detail-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="product-detail-title"
+            initial={{ opacity: 0, y: 16, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.98, transition: { duration: 0.16 } }}
+            transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
+          >
             <div className="product-detail-heading">
               <div><span className="product-detail-icon"><Boxes size={19} /></span>
                 <div><h2 id="product-detail-title">{selectedProduct.name}</h2><small>{selectedProduct.sku || t("catalog.noSku")}</small></div>
@@ -237,9 +248,10 @@ export default function ProductsPage() {
               </form>
               <ErrorMessage>{error}</ErrorMessage>
             </div>
-          </section>
-        </div>
+          </motion.section>
+        </motion.div>
       )}
+      </AnimatePresence>
     </>
   );
 }
