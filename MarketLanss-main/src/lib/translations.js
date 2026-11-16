@@ -59,6 +59,9 @@ export const messages = {
 
 Object.assign(messages.en, {
   dashboard: "Dashboard",
+  darkMode: "Dark mode",
+  welcomeBack: "Welcome back",
+  vsPreviousMonth: "Last full month vs the month before",
   dashboardNav: "Dashboard",
   financials: "Financials",
   reports: "Reports",
@@ -197,6 +200,9 @@ Object.assign(messages.ru, {
   reports: "Отчеты",
   navReturns: "Возвраты",
   uploadNav: "Импорт",
+  darkMode: "Тёмная тема",
+  welcomeBack: "С возвращением",
+  vsPreviousMonth: "Последний полный месяц к предыдущему",
   revenue: "Выручка",
   refunds: "Возвраты средств",
   grossFromOrders: "Продажи по импортированным заказам",
@@ -278,6 +284,9 @@ Object.assign(messages.ru, {
 });
 Object.assign(messages.uz, {
   dashboardNav: "Bosh sahifa",
+  darkMode: "Tungi rejim",
+  welcomeBack: "Xush kelibsiz",
+  vsPreviousMonth: "Oxirgi to‘liq oy oldingi oyga nisbatan",
   financials: "Moliyaviy hisobot",
   reports: "Hisobotlar",
   navReturns: "Qaytarishlar",
