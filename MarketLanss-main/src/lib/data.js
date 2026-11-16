@@ -593,3 +593,11 @@ export function makeCsv(rows) {
   const headers = Object.keys(rows[0]);
   return [headers.map(escapeCsv).join(","), ...rows.map((row) => headers.map((key) => escapeCsv(row[key])).join(","))].join("\r\n");
 }
+
+// Fractional change between the last two values (0.25 = +25%); null when there is no fair comparison.
+export function latestChange(values) {
+  if (values.length < 2) return null;
+  const [previous, current] = values.slice(-2);
+  if (!Number.isFinite(previous) || !Number.isFinite(current) || previous === 0) return null;
+  return (current - previous) / Math.abs(previous);
+}

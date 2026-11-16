@@ -11,6 +11,7 @@ import assert from "node:assert/strict";
     inferReportTypeFromFileName,
     inferReportTypeFromHeaders,
   calculateReturns,
+  latestChange,
   categorizeReturn,
   escapeCsv,
   inspectRows,
@@ -305,4 +306,16 @@ test("demo records are linked consistently and include intentional audit cases",
 test("CSV export escapes formulas without changing numeric negatives", () => {
   assert.equal(escapeCsv("=1+1"), "\"'=1+1\"");
   assert.equal(escapeCsv(-12), "\"-12\"");
+});
+
+test("latestChange compares the last two values as a fraction", () => {
+  assert.equal(latestChange([100, 125]), 0.25);
+  assert.equal(latestChange([50, 200, 150]), -0.25);
+});
+
+test("latestChange is null when there is nothing meaningful to compare", () => {
+  assert.equal(latestChange([100]), null);
+  assert.equal(latestChange([]), null);
+  assert.equal(latestChange([0, 40]), null);
+  assert.equal(latestChange([100, Number.NaN]), null);
 });
