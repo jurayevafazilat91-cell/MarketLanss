@@ -4,7 +4,17 @@ import { useMemo, useRef, useState } from "react";
 import { CheckCircle2, FileSpreadsheet, FileUp, LoaderCircle } from "lucide-react";
 import { useApp } from "@/components/app-context";
 import { Badge, Button, Card, ErrorMessage, PageHeader, SuccessMessage } from "@/components/ui";
-import { analyzeColumnTypes, fields, inspectRows, mapRows, parseUpload, recognizeColumns, reportTypes } from "@/lib/data";
+import {
+  analyzeColumnTypes,
+  fields,
+  inferReportTypeFromFileName,
+  inferReportTypeFromHeaders,
+  inspectRows,
+  mapRows,
+  parseUpload,
+  recognizeColumns,
+  reportTypes,
+} from "@/lib/data";
 import { translateField, translateReport } from "@/lib/translations";
 
 const requiredField = { orders: "orderId", payments: "orderId", products: "product", feedback: "comment" };
@@ -24,6 +34,7 @@ function translateFileError(error, t) {
 export default function ImportPage() {
   const { imports, t, save, notify } = useApp();
   const fileInput = useRef(null);
+  const manuallySelectedReportType = useRef(false);
   const [reportType, setReportType] = useState("orders");
   const [file, setFile] = useState(null);
   const [parsed, setParsed] = useState(null);
@@ -54,6 +65,10 @@ export default function ImportPage() {
     setBusy(true);
     try {
       const result = await parseUpload(file);
+      if (!manuallySelectedReportType.current && !inferReportTypeFromFileName(file.name)) {
+        const inferredType = inferReportTypeFromHeaders(result.headers);
+        if (inferredType) setReportType(inferredType);
+      }
       setParsed(result);
       setMappings(Object.fromEntries(recognizeColumns(result.headers).map(({ header, field }) => [header, field])));
       setProblemRowsOnly(false);
@@ -67,9 +82,20 @@ export default function ImportPage() {
   }
 
   function changeReportType(value) {
+    manuallySelectedReportType.current = true;
     setReportType(value);
     setParsed(null);
     setSuccess("");
+  }
+
+  function selectFile(nextFile) {
+    manuallySelectedReportType.current = false;
+    setFile(nextFile);
+    setParsed(null);
+    setError("");
+    setSuccess("");
+    const inferredType = nextFile ? inferReportTypeFromFileName(nextFile.name) : null;
+    if (inferredType) setReportType(inferredType);
   }
 
   async function confirmImport() {
@@ -133,12 +159,12 @@ export default function ImportPage() {
                 <div className="upload-drop" onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
                   event.preventDefault();
                   const dropped = event.dataTransfer.files?.[0];
-                  if (dropped) { setFile(dropped); setParsed(null); setError(""); setSuccess(""); }
+                  if (dropped) selectFile(dropped);
                 }}>
                   <FileSpreadsheet size={22} />
                   <strong>{file ? file.name : t("dropFile")}</strong>
                   <p>{file ? `${(file.size / 1024).toFixed(1)} KB` : t("fileRestrictions")}</p>
-                  <input ref={fileInput} type="file" accept=".csv,.xlsx,.xls" required onChange={(event) => { setFile(event.target.files?.[0] ?? null); setParsed(null); setError(""); setSuccess(""); }} aria-label={t("fileLabel")} />
+                  <input ref={fileInput} type="file" accept=".csv,.xlsx,.xls" required onChange={(event) => selectFile(event.target.files?.[0] ?? null)} aria-label={t("fileLabel")} />
                 </div>
               </div>
             </div>

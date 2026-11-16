@@ -144,6 +144,39 @@ Object.assign(messages.en, {
   noReturnReason: "Map a Return Reason or Customer Feedback column before importing this report.",
   customerReason: "Customer feedback",
 });
+Object.assign(messages.en, {
+  inventorySource: "Inventory source",
+  inventorySourceHelp: "Choose the CSV or Excel file used for current product stock. Replacing it keeps your orders and other reports, and clears manual stock edits so the new file is used.",
+  inventorySourceCurrent: "Current file",
+  inventorySourceNone: "No inventory file selected",
+  inventorySourceReplace: "Replace inventory file",
+  inventorySourceReplacing: "Replacing…",
+  inventorySourceDone: "Inventory source updated.",
+  inventorySourceColumnsError: "The file must include a recognized product name or SKU column and a stock quantity column.",
+  inventorySourceRowsError: "Every row must have a product name or SKU and a non-negative whole-number stock quantity.",
+});
+Object.assign(messages.ru, {
+  inventorySource: "Источник данных об остатках",
+  inventorySourceHelp: "Выберите CSV- или Excel-файл с текущими остатками. Замена сохранит заказы и другие отчеты, но удалит ручные изменения остатков.",
+  inventorySourceCurrent: "Текущий файл",
+  inventorySourceNone: "Файл остатков не выбран",
+  inventorySourceReplace: "Заменить файл остатков",
+  inventorySourceReplacing: "Замена…",
+  inventorySourceDone: "Источник данных об остатках обновлен.",
+  inventorySourceColumnsError: "В файле нужны распознанные столбцы с названием товара или артикулом и количеством на складе.",
+  inventorySourceRowsError: "В каждой строке должно быть название товара или артикул и неотрицательное целое количество.",
+});
+Object.assign(messages.uz, {
+  inventorySource: "Zaxira manbasi",
+  inventorySourceHelp: "Joriy mahsulot zaxirasi uchun CSV yoki Excel faylini tanlang. Almashtirish buyurtmalar va boshqa hisobotlarni saqlaydi, ammo zaxiraning qo‘lda kiritilgan o‘zgarishlarini tozalaydi.",
+  inventorySourceCurrent: "Joriy fayl",
+  inventorySourceNone: "Zaxira fayli tanlanmagan",
+  inventorySourceReplace: "Zaxira faylini almashtirish",
+  inventorySourceReplacing: "Almashtirilmoqda…",
+  inventorySourceDone: "Zaxira manbasi yangilandi.",
+  inventorySourceColumnsError: "Faylda taniladigan mahsulot nomi yoki SKU hamda zaxira miqdori ustunlari bo‘lishi kerak.",
+  inventorySourceRowsError: "Har bir qatorda mahsulot nomi yoki SKU va manfiy bo‘lmagan butun zaxira miqdori bo‘lishi kerak.",
+});
 Object.assign(messages.en.fields, {
   returnId: "Return ID",
   customerFeedback: "Full customer feedback",

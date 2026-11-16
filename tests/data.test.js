@@ -7,6 +7,9 @@ import assert from "node:assert/strict";
     calculateInventoryInsights,
     calculateProductCatalog,
     calculatePaymentAudit,
+    createInventoryImport,
+    inferReportTypeFromFileName,
+    inferReportTypeFromHeaders,
   calculateReturns,
   categorizeReturn,
   escapeCsv,
@@ -34,6 +37,30 @@ test("parses CSV with comma, semicolon, and tab delimiters", async () => {
   assert.ok(products.some((row) => row.discountPercent > 0 && row.promotion));
 });
 
+test("creates a replacement inventory import only from complete product and stock data", () => {
+  const inventory = createInventoryImport({
+    fileName: "warehouse.csv",
+    headers: ["SKU", "Available stock", "Product name"],
+    rows: [
+      { SKU: "L-1", "Available stock": "8", "Product name": "Desk lamp" },
+      { SKU: "M-1", "Available stock": "0", "Product name": "Mug" },
+    ],
+  });
+  assert.equal(inventory.fileName, "warehouse.csv");
+  assert.equal(inventory.reportType, "products");
+  assert.deepEqual(inventory.rows.map((row) => [row.sku, row.stockQuantity]), [["L-1", 8], ["M-1", 0]]);
+  assert.throws(() => createInventoryImport({
+    fileName: "bad.csv",
+    headers: ["Unmapped column", "Stock"],
+    rows: [{ "Unmapped column": "Lamp", Stock: "2" }],
+  }), /INVENTORY_COLUMNS/);
+  assert.throws(() => createInventoryImport({
+    fileName: "bad.csv",
+    headers: ["SKU", "Stock"],
+    rows: [{ SKU: "L-1", Stock: "-2" }],
+  }), /INVENTORY_ROWS/);
+});
+
 test("parses the first worksheet in an Excel workbook", async () => {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([["order_id", "amount"], ["A-2", 28.5]]), "Orders");
@@ -57,6 +84,18 @@ test("recognizes normalized headers and requires confirmation for ambiguous amou
   assert.deepEqual(result.map((column) => column.field), ["product", "sku", "orderId", "", "amount"]);
   assert.equal(result[3].confidence, "low");
   assert.equal(recognizeColumns(["feedback"])[0].field, "comment");
+});
+
+test("infers report type from common filenames and generic file headers", () => {
+  assert.equal(inferReportTypeFromFileName("products.csv"), "products");
+  assert.equal(inferReportTypeFromFileName("myProductsCSV.xlsx"), "products");
+  assert.equal(inferReportTypeFromFileName("orders_export.csv"), "orders");
+  assert.equal(inferReportTypeFromFileName("seller-export.csv"), null);
+  assert.equal(inferReportTypeFromHeaders(["SKU", "Available stock"]), "products");
+  assert.equal(inferReportTypeFromHeaders(["order_id", "amount", "transaction_type"]), "payments");
+  assert.equal(inferReportTypeFromHeaders(["order_id", "product_name", "unit_price"]), "orders");
+  assert.equal(inferReportTypeFromHeaders(["return_id", "order_id", "reason"]), "returns");
+  assert.equal(inferReportTypeFromHeaders(["product_name", "comment"]), "feedback");
 });
 
 test("maps optional return, customer, marketplace, and inventory fields without losing feedback text", () => {

@@ -96,6 +96,43 @@ export function recognizeColumns(headers) {
   });
 }
 
+export function inferReportTypeFromFileName(fileName) {
+  const name = String(fileName ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (/products?|inventory|stock|catalog/.test(name)) return "products";
+  if (/payments?|settlement|transactions?/.test(name)) return "payments";
+  if (/returns?|refunds?/.test(name)) return "returns";
+  if (/feedback|reviews?/.test(name)) return "feedback";
+  if (/orders?/.test(name)) return "orders";
+  return null;
+}
+
+export function inferReportTypeFromHeaders(headers) {
+  const mappedFields = new Set(recognizeColumns(headers).map(({ field }) => field).filter(Boolean));
+  const hasProduct = mappedFields.has("product") || mappedFields.has("sku");
+  if (mappedFields.has("returnId") || mappedFields.has("returnReason") || mappedFields.has("customerFeedback")) {
+    return "returns";
+  }
+  if (mappedFields.has("orderId") && (
+    mappedFields.has("transactionType") || mappedFields.has("fee") || mappedFields.has("refund")
+  )) {
+    return "payments";
+  }
+  if (hasProduct && mappedFields.has("stockQuantity")) return "products";
+  if (mappedFields.has("orderId") && (
+    mappedFields.has("amount") || mappedFields.has("unitPrice") || mappedFields.has("quantity")
+  )) {
+    return "orders";
+  }
+  if (mappedFields.has("comment")) return "feedback";
+  if (hasProduct && (
+    mappedFields.has("unitPrice") || mappedFields.has("description") ||
+    mappedFields.has("discountPercent") || mappedFields.has("promotion")
+  )) {
+    return "products";
+  }
+  return null;
+}
+
 export async function parseUpload(file) {
   const extension = file.name.split(".").pop()?.toLowerCase();
   if (!["csv", "xlsx", "xls"].includes(extension)) {
@@ -222,6 +259,36 @@ export function mapRows(rows, mappings) {
     if (result.refund > 0) result.refund *= -1;
     return result;
   });
+}
+
+export function createInventoryImport({ fileName, headers, rows, parseWarnings = [] }) {
+  const mappings = Object.fromEntries(
+    recognizeColumns(headers).map(({ header, field }) => [header, field]),
+  );
+  const mappedFields = Object.values(mappings);
+  if ((!mappedFields.includes("product") && !mappedFields.includes("sku")) || !mappedFields.includes("stockQuantity")) {
+    throw new Error("INVENTORY_COLUMNS");
+  }
+
+  const mappedRows = mapRows(rows, mappings);
+  if (mappedRows.some((row) =>
+    (!row.product && !row.sku) ||
+    !Number.isSafeInteger(row.stockQuantity) ||
+    row.stockQuantity < 0,
+  )) {
+    throw new Error("INVENTORY_ROWS");
+  }
+
+  return {
+    id: crypto.randomUUID(),
+    fileName,
+    reportType: "products",
+    importedAt: new Date().toISOString(),
+    rows: mappedRows.map((row, index) => ({ ...row, original: rows[index] })),
+    warnings: parseWarnings,
+    isDemo: false,
+    sourceHeaders: headers,
+  };
 }
 
 export function inspectRows(rows, mappedRows, reportType) {
