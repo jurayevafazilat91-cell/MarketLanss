@@ -12,6 +12,7 @@ import assert from "node:assert/strict";
     inferReportTypeFromHeaders,
   calculateReturns,
   latestChange,
+  monthOverMonth,
   categorizeReturn,
   escapeCsv,
   inspectRows,
@@ -318,4 +319,15 @@ test("latestChange is null when there is nothing meaningful to compare", () => {
   assert.equal(latestChange([]), null);
   assert.equal(latestChange([0, 40]), null);
   assert.equal(latestChange([100, Number.NaN]), null);
+});
+
+test("monthOverMonth compares the last two months when they are consecutive", () => {
+  assert.equal(monthOverMonth([{ month: "2026-08", value: 100 }, { month: "2026-09", value: 150 }], "value"), 0.5);
+  assert.equal(monthOverMonth([{ month: "2025-12", value: 200 }, { month: "2026-01", value: 100 }], "value"), -0.5);
+});
+
+test("monthOverMonth is null when the last two months are not next to each other", () => {
+  assert.equal(monthOverMonth([{ month: "2026-01", value: 100 }, { month: "2026-03", value: 150 }], "value"), null);
+  assert.equal(monthOverMonth([{ month: "2026-03", value: 150 }], "value"), null);
+  assert.equal(monthOverMonth([], "value"), null);
 });
