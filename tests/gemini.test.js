@@ -11,6 +11,7 @@ import {
   inventoryAnalysisRequestSchema,
   inventoryAnalysisResponseSchema,
   readAnalysis,
+  readJsonBody,
   streamChatEvents,
   streamChatWithFallback,
 } from "../src/lib/gemini.js";
@@ -330,4 +331,21 @@ test("chat goes straight to the backup while the main model is cooling down", as
   await collect(streamChatWithFallback(open, picker, 1000));
   await collect(streamChatWithFallback(open, picker, 2000));
   assert.deepEqual(opened, ["main", "backup", "backup"]);
+});
+
+const post = (headers, body = "{}") => new Request("https://shop.example/api/store", { method: "PUT", headers, body });
+
+test("readJsonBody accepts same-origin JSON and no Origin header", async () => {
+  const json = { "Content-Type": "application/json" };
+  assert.deepEqual((await readJsonBody(post(json, '{"a":1}'), 100)).data, { a: 1 });
+  assert.deepEqual((await readJsonBody(post({ ...json, Origin: "https://shop.example" }), 100)).data, {});
+});
+
+test("readJsonBody rejects other origins, an Origin of null, wrong content type, big and broken bodies", async () => {
+  const json = { "Content-Type": "application/json" };
+  assert.equal((await readJsonBody(post({ ...json, Origin: "https://evil.example" }), 100)).status, 403);
+  assert.equal((await readJsonBody(post({ ...json, Origin: "null" }), 100)).status, 403);
+  assert.equal((await readJsonBody(post({ "Content-Type": "text/plain" }), 100)).status, 415);
+  assert.equal((await readJsonBody(post(json, "x".repeat(101)), 100)).status, 413);
+  assert.equal((await readJsonBody(post(json, "{nope"), 100)).status, 400);
 });

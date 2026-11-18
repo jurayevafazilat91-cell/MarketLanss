@@ -229,11 +229,12 @@ export async function* streamChatWithFallback(open, picker = defaultPicker, now 
   }
 }
 
-// Shared guard for the AI routes: same-origin JSON only, with a size cap before parsing.
+// Shared guard for the API routes: same-origin JSON only, with a size cap before parsing.
 export async function readJsonBody(request, maxLength) {
+  // Compared as plain text: browsers send "Origin: null" from sandboxed pages, which is not a valid URL.
   const origin = request.headers.get("origin");
-  if (origin && new URL(origin).origin !== new URL(request.url).origin) {
-    return { status: 403, error: "Cross-origin AI requests are not allowed." };
+  if (origin && origin !== new URL(request.url).origin) {
+    return { status: 403, error: "Cross-origin requests are not allowed." };
   }
   if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
     return { status: 415, error: "Send the request as JSON." };

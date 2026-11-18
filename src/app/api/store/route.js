@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { readJsonBody } from "@/lib/gemini";
 import { getMongoStoreCollection } from "@/lib/mongodb";
 
 export const runtime = "nodejs";
@@ -72,8 +73,9 @@ export async function GET() {
 
 export async function PUT(request) {
   try {
-    const body = await request.json();
-    const parsed = schema.safeParse(body);
+    const body = await readJsonBody(request, 5_000_000);
+    if (body.error) return NextResponse.json({ error: body.error }, { status: body.status });
+    const parsed = schema.safeParse(body.data);
     if (!parsed.success) return NextResponse.json({ error: "The submitted data did not pass validation.", details: parsed.error.issues }, { status: 400 });
     await saveStore(parsed.data);
     return NextResponse.json({ ok: true });
