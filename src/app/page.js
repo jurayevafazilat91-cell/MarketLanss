@@ -328,16 +328,16 @@ export default function DashboardPage() {
                 </Card>
               </motion.div>
             </div>
-            <motion.aside className="dashboard-side" variants={rise}>
+            <motion.aside className="dashboard-side" variants={rise} aria-labelledby="ai-panel-title">
               <Card className="dashboard-panel ai-panel">
                 <div className="ai-head">
                   <span className={`ai-orb ${aiBusy ? "ai-orb-busy" : ""}`} aria-hidden="true" />
                   <div>
-                    <h2>{t("aiInventoryTitle")}</h2>
-                    <p><span className={`ai-status-dot ${aiReady ? "ai-status-ready" : ""}`} />{aiStatus === "missing" || aiStatus === "unavailable" ? t("aiNotConfigured") : "DeepSeek"}</p>
+                    <h2 id="ai-panel-title">{t("aiInventoryTitle")}</h2>
+                    <p><span className={`ai-status-dot ${aiReady ? "ai-status-ready" : ""}`} />{aiStatus === "checking" ? t("loading") : aiReady ? "DeepSeek" : t("aiNotConfigured")}</p>
                   </div>
                 </div>
-                <div className="ai-scroll">
+                <div className="ai-scroll" tabIndex={0} role="region" aria-labelledby="ai-panel-title">
                   <p className="ai-bubble" aria-live="polite">{analysis?.summary || t("aiInventoryDescription")}</p>
                   {aiStatus === "missing" && <p className="ai-setup-note">{t("aiSetupHint")} <code>DEEPSEEK_API_KEY</code> {t("aiSetupHintEnd")}</p>}
                   {aiStatus === "unavailable" && <p className="ai-error" role="status">{t("aiStatusUnavailable")}</p>}

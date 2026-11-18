@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { easeOut } from "@/components/motion";
 import {
@@ -59,6 +59,7 @@ export default function ProductsPage() {
   const [view, setView] = useState("cards");
   const [search, setSearch] = useState("");
   const [selectedKey, setSelectedKey] = useState("");
+  const dialogRef = useRef(null);
   const [period, setPeriod] = useState("week");
   const [stockDraft, setStockDraft] = useState("");
   const [saving, setSaving] = useState(false);
@@ -74,6 +75,27 @@ export default function ProductsPage() {
       : products;
   }, [products, search]);
   const selectedProduct = products.find((product) => product.key === selectedKey);
+  const dialogOpen = Boolean(selectedProduct);
+  // Dialog keyboard contract: focus moves in, Tab stays inside, Escape closes, focus returns to the opener.
+  useEffect(() => {
+    if (!dialogOpen) return undefined;
+    const opener = document.activeElement;
+    const dialog = dialogRef.current;
+    dialog?.querySelector("button")?.focus();
+    const onKey = (event) => {
+      if (event.key === "Escape") { setSelectedKey(""); return; }
+      if (event.key !== "Tab" || !dialog) return;
+      const focusable = dialog.querySelectorAll("button:not(:disabled), input:not(:disabled)");
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey ? document.activeElement === first : document.activeElement === last) {
+        event.preventDefault();
+        (event.shiftKey ? last : first)?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("keydown", onKey); opener?.focus?.(); };
+  }, [dialogOpen]);
   // Phones show the dialog as a bottom sheet, so it rises from the edge it is attached to. Only read after a click, never on the server.
   const sheet = Boolean(selectedProduct) && window.matchMedia("(max-width: 680px)").matches;
 
@@ -207,6 +229,7 @@ export default function ProductsPage() {
           if (event.target === event.currentTarget) setSelectedKey("");
         }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.16 } }} transition={{ duration: 0.2 }}>
           <motion.section
+            ref={dialogRef}
             className="product-detail-modal"
             role="dialog"
             aria-modal="true"
