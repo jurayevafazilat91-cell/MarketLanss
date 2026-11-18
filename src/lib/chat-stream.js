@@ -1,4 +1,4 @@
-// Browser-side helpers for the /api/chat stream. Kept free of the Anthropic SDK so it never lands in the client bundle.
+// Browser-side helpers for the /api/chat stream. Kept free of the AI SDK so it never lands in the client bundle.
 
 // Splits newline-delimited JSON; the last, possibly partial, line is kept for the next chunk.
 export function readNdjson(buffer, chunk) {
