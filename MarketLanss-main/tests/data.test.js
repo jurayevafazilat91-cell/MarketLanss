@@ -13,6 +13,9 @@ import assert from "node:assert/strict";
   calculateReturns,
   latestChange,
   monthOverMonth,
+  calculateMonthlyTotals,
+  calculateMonthlyOrders,
+  buildWorkspaceSummary,
   categorizeReturn,
   escapeCsv,
   inspectRows,
@@ -330,4 +333,35 @@ test("monthOverMonth is null when the last two months are not next to each other
   assert.equal(monthOverMonth([{ month: "2026-01", value: 100 }, { month: "2026-03", value: 150 }], "value"), null);
   assert.equal(monthOverMonth([{ month: "2026-03", value: 150 }], "value"), null);
   assert.equal(monthOverMonth([], "value"), null);
+});
+
+test("calculateMonthlyTotals only creates months from priced orders, refunds and returns", () => {
+  const imports = [
+    { reportType: "orders", rows: [{ date: "2026-01-05", amount: 10 }, { date: "2026-02-03", amount: null }] },
+    { reportType: "payments", rows: [{ date: "2026-03-01", transactionType: "refund", amount: -4 }] },
+  ];
+  assert.deepEqual(calculateMonthlyTotals(imports), [
+    { month: "2026-01", revenue: 10, refunds: 0, returns: 0 },
+    { month: "2026-03", revenue: 0, refunds: 4, returns: 0 },
+  ]);
+});
+
+test("calculateMonthlyOrders counts dated order rows per month", () => {
+  const imports = [{ reportType: "orders", rows: [{ date: "2026-01-05" }, { date: "2026-01-09" }, { date: "" }, { date: "2026-02-01" }] }];
+  assert.deepEqual(calculateMonthlyOrders(imports), [{ month: "2026-01", orders: 2 }, { month: "2026-02", orders: 1 }]);
+});
+
+test("buildWorkspaceSummary is compact and leaves out customer details", () => {
+  const imports = createDemoImports();
+  const summary = buildWorkspaceSummary(imports);
+  const json = JSON.stringify(summary);
+  assert.ok(summary.monthly.length > 0 && summary.monthly.length <= 18);
+  assert.ok(summary.inventory.length <= 25);
+  assert.equal(typeof summary.returns.totalReturns, "number");
+  assert.equal(typeof summary.payments.discrepancyCount, "number");
+  assert.ok(json.length < 60000, `summary is ${json.length} characters`);
+  const customerValues = imports.flatMap((item) => item.rows).flatMap((row) =>
+    Object.entries(row).filter(([key, value]) => /^customer/i.test(key) && typeof value === "string" && value.length > 3).map(([, value]) => value));
+  assert.ok(customerValues.length > 0, "demo data should contain customer fields to check against");
+  for (const value of customerValues) assert.equal(json.includes(value), false, `summary leaks ${value}`);
 });

@@ -86,9 +86,9 @@ Object.assign(messages.en, {
   noInventoryData: "No product trend data yet",
   inventoryImportHint: "Import products with stock quantities and dated orders for replenishment signals.",
   inventoryAnalysisDisclaimer: "Recommendations use only imported stock and order history. They are directional signals, not forecasts or purchase orders.",
-  aiInventoryTitle: "AI stock and trend advice",
+  aiInventoryTitle: "Claude AI assistant",
   aiNotConfigured: "Setup needed",
-  aiInventoryDescription: "Ask DeepSeek to review imported stock, product sales, and seasonal evidence.",
+  aiInventoryDescription: "Ask Claude about your sales, returns, payments and stock. Answers use only the data you imported.",
   marketSeasonContext: "Market or season context (optional)",
   marketSeasonPlaceholder: "For example: US, Northern Hemisphere; holiday gift season",
   aiSetupHint: "Add a rotated API key named",
@@ -97,7 +97,7 @@ Object.assign(messages.en, {
   analyzeWithAi: "Analyze inventory",
   aiAnalyzing: "Analyzing…",
   aiRequestFailed: "The AI analysis failed. Please try again.",
-  aiPrivacyDisclaimer: "Only product names, SKUs, stock levels, monthly unit-sales totals, and the optional market/season context are sent to DeepSeek. No customer or return details are included. AI suggestions are not purchase orders; no live external trend data is available.",
+  aiPrivacyDisclaimer: "Claude (Anthropic) receives monthly totals, payment check results, return reason counts, product names, SKUs and stock levels, plus your question. Customer names, contacts and feedback text are never sent. Answers are suggestions, not purchase orders.",
   aiEvidence: "Evidence",
   confidencelow: "Low confidence",
   confidencemedium: "Medium confidence",
@@ -221,9 +221,9 @@ Object.assign(messages.ru, {
   noInventoryData: "Пока нет данных о товарах и спросе",
   inventoryImportHint: "Импортируйте остатки и датированные заказы для оценки пополнения запасов.",
   inventoryAnalysisDisclaimer: "Рекомендации основаны только на импортированных остатках и заказах. Это ориентиры, а не прогнозы или заказы на закупку.",
-  aiInventoryTitle: "AI-рекомендации по запасам и трендам",
+  aiInventoryTitle: "ИИ-ассистент Claude",
   aiNotConfigured: "Требуется настройка",
-  aiInventoryDescription: "DeepSeek анализирует импортированные остатки, продажи товаров и сезонные данные.",
+  aiInventoryDescription: "Спросите Claude о продажах, возвратах, платежах и остатках. Ответы основаны только на импортированных данных.",
   marketSeasonContext: "Рынок или сезон (необязательно)",
   marketSeasonPlaceholder: "Например: США, Северное полушарие; сезон праздничных подарков",
   aiSetupHint: "Добавьте новый API-ключ с именем",
@@ -232,7 +232,7 @@ Object.assign(messages.ru, {
   analyzeWithAi: "Анализировать запасы",
   aiAnalyzing: "Анализ…",
   aiRequestFailed: "Не удалось выполнить AI-анализ. Попробуйте ещё раз.",
-  aiPrivacyDisclaimer: "DeepSeek получает только названия и SKU товаров, остатки, помесячные продажи и необязательный контекст рынка/сезона. Данные клиентов и возвратов не отправляются. Рекомендации AI — не заказ на закупку; актуальные внешние тренды недоступны.",
+  aiPrivacyDisclaimer: "Claude (Anthropic) получает помесячные итоги, результаты сверки платежей, количество возвратов по причинам, названия и SKU товаров, остатки и ваш вопрос. Имена, контакты и отзывы клиентов не передаются. Ответы — это рекомендации, а не заказы на закупку.",
   aiEvidence: "Основание",
   confidencelow: "Низкая уверенность",
   confidencemedium: "Средняя уверенность",
@@ -309,9 +309,9 @@ Object.assign(messages.uz, {
   noInventoryData: "Mahsulot yoki talab ma’lumoti yo‘q",
   inventoryImportHint: "Zaxira va sanali buyurtmalarni import qiling.",
   inventoryAnalysisDisclaimer: "Tavsiyalar faqat import qilingan zaxira va buyurtmalarga asoslanadi. Ular prognoz yoki xarid buyurtmasi emas.",
-  aiInventoryTitle: "AI zaxira va trend tavsiyalari",
+  aiInventoryTitle: "Claude AI yordamchisi",
   aiNotConfigured: "Sozlash kerak",
-  aiInventoryDescription: "DeepSeek import qilingan zaxira, mahsulot savdosi va mavsumiy dalillarni tahlil qiladi.",
+  aiInventoryDescription: "Claude’dan savdo, qaytarishlar, to‘lovlar va zaxira haqida so‘rang. Javoblar faqat siz import qilgan ma’lumotlarga asoslanadi.",
   marketSeasonContext: "Bozor yoki mavsum (ixtiyoriy)",
   marketSeasonPlaceholder: "Masalan: AQSh, Shimoliy yarimshar; bayram sovg‘alari mavsumi",
   aiSetupHint: "Yangi API kalitini",
@@ -320,7 +320,7 @@ Object.assign(messages.uz, {
   analyzeWithAi: "Zaxirani tahlil qilish",
   aiAnalyzing: "Tahlil qilinmoqda…",
   aiRequestFailed: "AI tahlili bajarilmadi. Qayta urinib ko‘ring.",
-  aiPrivacyDisclaimer: "DeepSeek’ga faqat mahsulot nomlari va SKU, zaxira miqdori, oylik savdo hamda ixtiyoriy bozor/mavsum konteksti yuboriladi. Mijoz va qaytarish ma’lumotlari yuborilmaydi. AI tavsiyalari xarid buyurtmasi emas; tashqi jonli trendlar mavjud emas.",
+  aiPrivacyDisclaimer: "Claude (Anthropic) oylik jami ko‘rsatkichlar, to‘lov tekshiruvi natijalari, qaytarish sabablari soni, mahsulot nomlari, SKU va zaxira miqdorini hamda savolingizni oladi. Mijozlarning ismi, aloqa ma’lumotlari va fikrlari yuborilmaydi. Javoblar xarid buyurtmasi emas, tavsiya.",
   aiEvidence: "Dalil",
   confidencelow: "Ishonch past",
   confidencemedium: "Ishonch o‘rtacha",
@@ -397,6 +397,81 @@ Object.assign(messages.uz.fields, {
   marketplaceConversationUrl: "Suhbat havolasi",
   marketplaceAccountUrl: "Marketplace hisob havolasi",
   stockQuantity: "Joriy zaxira",
+});
+
+Object.assign(messages.en, {
+  "chatPlaceholder": "Ask about sales, returns or stock…",
+  "chatSend": "Send question",
+  "chatStop": "Stop the answer",
+  "chatYou": "You",
+  "chatClaude": "Claude",
+  "chatWriting": "Claude is writing…",
+  "chatTruncated": "The answer was cut off. Ask Claude to continue.",
+  "newChat": "New chat",
+  "chatSuggestions": [
+    "Which products are returned most, and why?",
+    "How did revenue change last month?",
+    "Which products should I restock first?"
+  ],
+  "chatErrors": {
+    "refusal": "Claude declined to answer this. Try rephrasing the question.",
+    "auth": "Claude rejected the API key. Check ANTHROPIC_API_KEY.",
+    "rate_limit": "Claude is busy right now. Try again in a minute.",
+    "connection": "Could not reach Claude. Check your connection and try again.",
+    "unavailable": "Claude could not answer. Please try again.",
+    "unknown": "Something went wrong. Please try again.",
+    "not_configured": "Claude is not set up yet. Add ANTHROPIC_API_KEY."
+  }
+});
+
+Object.assign(messages.ru, {
+  "chatPlaceholder": "Спросите о продажах, возвратах или остатках…",
+  "chatSend": "Отправить вопрос",
+  "chatStop": "Остановить ответ",
+  "chatYou": "Вы",
+  "chatClaude": "Claude",
+  "chatWriting": "Claude пишет…",
+  "chatTruncated": "Ответ оборвался. Попросите Claude продолжить.",
+  "newChat": "Новый чат",
+  "chatSuggestions": [
+    "Какие товары возвращают чаще всего и почему?",
+    "Как изменилась выручка в прошлом месяце?",
+    "Какие товары пополнить в первую очередь?"
+  ],
+  "chatErrors": {
+    "refusal": "Claude отказался отвечать. Попробуйте переформулировать вопрос.",
+    "auth": "Claude отклонил API-ключ. Проверьте ANTHROPIC_API_KEY.",
+    "rate_limit": "Claude сейчас перегружен. Повторите через минуту.",
+    "connection": "Не удалось связаться с Claude. Проверьте подключение и повторите.",
+    "unavailable": "Claude не смог ответить. Повторите попытку.",
+    "unknown": "Что-то пошло не так. Повторите попытку.",
+    "not_configured": "Claude ещё не настроен. Добавьте ANTHROPIC_API_KEY."
+  }
+});
+
+Object.assign(messages.uz, {
+  "chatPlaceholder": "Savdo, qaytarish yoki zaxira haqida so‘rang…",
+  "chatSend": "Savolni yuborish",
+  "chatStop": "Javobni to‘xtatish",
+  "chatYou": "Siz",
+  "chatClaude": "Claude",
+  "chatWriting": "Claude yozmoqda…",
+  "chatTruncated": "Javob uzilib qoldi. Claude’dan davom ettirishni so‘rang.",
+  "newChat": "Yangi chat",
+  "chatSuggestions": [
+    "Qaysi mahsulotlar eng ko‘p qaytariladi va nega?",
+    "O‘tgan oy daromad qanday o‘zgardi?",
+    "Qaysi mahsulotlarni birinchi navbatda to‘ldirish kerak?"
+  ],
+  "chatErrors": {
+    "refusal": "Claude bu savolga javob bermadi. Savolni boshqacha yozib ko‘ring.",
+    "auth": "Claude API kalitini rad etdi. ANTHROPIC_API_KEY’ni tekshiring.",
+    "rate_limit": "Claude hozir band. Bir daqiqadan keyin qayta urinib ko‘ring.",
+    "connection": "Claude bilan bog‘lanib bo‘lmadi. Internetni tekshirib, qayta urinib ko‘ring.",
+    "unavailable": "Claude javob bera olmadi. Qayta urinib ko‘ring.",
+    "unknown": "Nimadir xato ketdi. Qayta urinib ko‘ring.",
+    "not_configured": "Claude hali sozlanmagan. ANTHROPIC_API_KEY qo‘shing."
+  }
 });
 
 export function translate(language, key) {

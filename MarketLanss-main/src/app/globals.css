@@ -336,6 +336,25 @@ code { font-size: .92em; }
 .analysis-disclaimer { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .ai-foot { flex: 0 0 auto; display: grid; gap: 9px; padding: 0 16px 16px; }
 .ai-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; scrollbar-color: var(--line-strong) transparent; }
+.ai-head-action { margin-left: auto; }
+.ai-analyze { display: flex; gap: 8px; }
+.ai-analyze .input { flex: 1; min-width: 0; }
+.ai-chat { display: grid; gap: 10px; }
+.ai-chat:empty { display: none; }
+.chat-msg { max-width: 92%; padding: 10px 12px; border-radius: 14px; font-size: 13px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-user { justify-self: end; border-bottom-right-radius: 4px; background: var(--accent); color: var(--on-accent); }
+.chat-claude { justify-self: start; border: 1px solid var(--line); border-bottom-left-radius: 4px; background: var(--neutral-soft); color: var(--text); }
+.chat-claude.chat-error { border-color: color-mix(in srgb, var(--red) 40%, transparent); background: var(--red-soft); color: var(--red); }
+.chat-note { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; }
+.chat-typing { display: inline-flex; gap: 4px; padding: 4px 0; }
+.chat-typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: chat-dot 1s ease-in-out infinite; }
+.chat-typing i:nth-child(2) { animation-delay: .15s; }
+.chat-typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes chat-dot { 0%, 80%, 100% { opacity: .3; } 40% { opacity: 1; } }
+.ai-suggestions { display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-suggestion { padding: 6px 11px; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; color: var(--text-2); font-size: 12px; text-align: left; transition: border-color .15s ease, color .15s ease, transform .12s var(--ease-out); }
+.ai-suggestion:active { transform: scale(.97); }
+.ai-composer input:disabled { cursor: not-allowed; }
 .ai-composer { display: flex; align-items: center; gap: 8px; padding: 6px; border: 1px solid var(--field-line); border-radius: 999px; background: var(--field-bg); transition: border-color .15s ease, box-shadow .15s ease; }
 .ai-composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .ai-composer-icon { flex: 0 0 34px; width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); }
@@ -493,11 +512,13 @@ code { font-size: .92em; }
   .product-view-switch button:hover, .product-period-switch button:hover { color: var(--text); }
   .ai-send:hover:not(:disabled) { background: var(--accent-strong); }
   .ai-scroll:hover { scrollbar-color: var(--line-strong) transparent; }
+  .ai-suggestion:hover { border-color: var(--accent); color: var(--text); }
   .upload-drop input[type="file"]::file-selector-button:hover { border-color: var(--muted); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ai-orb { animation: none; }
+  .ai-orb, .chat-typing i { animation: none; }
+  .chat-typing i { opacity: .6; }
   .button, .ai-send, .theme-switch::after { transition-duration: 0s; }
 }
 
@@ -572,5 +593,6 @@ code { font-size: .92em; }
   .stat-card strong { font-size: 21px; }
   .toast { right: 16px; bottom: 16px; }
   /* 16px stops iOS Safari from zooming the page when a field takes focus. */
+  .ai-analyze { flex-wrap: wrap; }
   .field input, .field select, .input, .select, .product-search input, .ai-composer input, .language-control select, .chart-type-control select { font-size: 16px; }
 }
