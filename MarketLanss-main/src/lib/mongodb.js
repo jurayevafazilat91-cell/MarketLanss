@@ -7,7 +7,8 @@ export async function getMongoStoreCollection() {
   if (!uri) return null;
 
   if (!globalForMongo.mongoClientPromise) {
-    const client = new MongoClient(uri);
+    // Fail in 5 s instead of the 30 s default when Atlas is unreachable (for example, an IP not on the access list).
+    const client = new MongoClient(uri, { serverSelectionTimeoutMS: 5000 });
     globalForMongo.mongoClientPromise = client.connect().catch((error) => {
       delete globalForMongo.mongoClientPromise;
       throw error;
