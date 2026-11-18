@@ -1,6 +1,6 @@
 # Marketplace Intelligence
 
-A JavaScript, Next.js App Router, and Tailwind CSS local-first app for importing marketplace CSV/XLS/XLSX reports, auditing settlements, and investigating returns. Data processing is deterministic; the app does not connect to marketplace APIs. Optional stock advice can use the DeepSeek API when configured. Excel parsing uses a maintained SheetJS-compatible release because the npm `xlsx` package version is affected by published security advisories.
+A JavaScript, Next.js App Router, and Tailwind CSS local-first app for importing marketplace CSV/XLS/XLSX reports, auditing settlements, and investigating returns. Data processing is deterministic; the app does not connect to marketplace APIs. An optional Claude AI assistant (Anthropic API) answers questions about the imported data and writes stock advice when configured. Excel parsing uses a maintained SheetJS-compatible release because the npm `xlsx` package version is affected by published security advisories.
 
 ## Run locally
 
@@ -43,7 +43,12 @@ Payments are matched by order ID. Expected values use order totals (or quantity 
 
 The dashboard's local stock signals use explainable rules over dated order quantities and imported stock levels. Treat these as directional indicators, not forecasts or purchase orders.
 
-The optional DeepSeek panel adds advice based on imported product names, stock levels, and dated unit-sales history. It sends no customer or return details and does not have live access to external trends; seasonality is considered only when the available history or seller-provided market context supports it. Treat advice as a hypothesis, not a forecast or purchase order. Configure a rotated API key in the ignored `.env.local` as `DEEPSEEK_API_KEY=...` and restart the app. The integration uses DeepSeek's `deepseek-chat` model and sends only `model` and a validated `messages` array, without `response_format` or other optional generation parameters.
+The optional Claude panel has two parts, both running on `claude-opus-5-5` through the official `@anthropic-ai/sdk`:
+
+- **Chat** (`/api/chat`, streamed): ask about sales, returns, payments or stock. Claude receives an aggregate workspace summary built by `buildWorkspaceSummary` in `src/lib/data.js` (monthly totals, payment check results, return reason counts, product names, SKUs and stock levels) plus the conversation. Customer names, contacts, IDs and feedback text are never sent.
+- **Stock analysis** (`/api/analytics`): the same product, stock and dated unit-sales data as before, returned as validated structured output. Seasonality is considered only when the history or the seller-provided market context supports it.
+
+Both requests opt into Anthropic server-side refusal fallbacks (`fallbacks: "default"`). Treat answers as hypotheses, not forecasts or purchase orders. Create a key at console.anthropic.com, put it in the ignored `.env.local` as `ANTHROPIC_API_KEY=...` (and in the Vercel project environment variables when deployed), then restart the app.
 
 Use the language selector to choose English, Russian, or Uzbek for application labels and analysis. Imported source values are not translated or modified.
 

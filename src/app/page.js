@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import {
   AlertTriangle,
@@ -17,12 +17,14 @@ import {
   Info,
   LoaderCircle,
   PackageSearch,
+  MessageSquarePlus,
   Percent,
   ReceiptText,
   SendHorizontal,
   ShoppingBag,
   ShoppingCart,
   Sparkles,
+  Square,
   Undo2,
 } from "lucide-react";
 import {
@@ -44,7 +46,8 @@ import {
 import { useApp } from "@/components/app-context";
 import { CountUp, easeOut, rise, stagger } from "@/components/motion";
 import { Badge, Button, Card, EmptyState, ErrorMessage, formatDate, formatMoney } from "@/components/ui";
-import { calculateInventoryInsights, calculatePaymentAudit, calculateReturns, monthOverMonth } from "@/lib/data";
+import { buildWorkspaceSummary, calculateInventoryInsights, calculateMonthlyOrders, calculateMonthlyTotals, calculatePaymentAudit, calculateReturns, monthOverMonth } from "@/lib/data";
+import { applyChatEvent, chatHistory, readNdjson } from "@/lib/chat-stream";
 import { createDemoImports } from "@/lib/demo";
 import { formatUzbekDate, translateReport } from "@/lib/translations";
 
@@ -66,39 +69,6 @@ function ChartTooltip({ active, payload, label, formatValue }) {
   );
 }
 
-function getMonthlyData(imports) {
-  const months = new Map();
-  const getMonth = (date) => {
-    const key = /^\d{4}-\d{2}/.test(date || "") ? date.slice(0, 7) : "Undated";
-    if (!months.has(key)) months.set(key, { month: key, revenue: 0, refunds: 0, returns: 0 });
-    return months.get(key);
-  };
-
-  imports.filter((item) => item.reportType === "orders").flatMap((item) => item.rows).forEach((row) => {
-    const revenue = row.amount ?? (Number.isFinite(row.unitPrice) && Number.isFinite(row.quantity) ? row.unitPrice * row.quantity : null);
-    if (Number.isFinite(revenue)) getMonth(row.date).revenue += revenue;
-  });
-  imports.filter((item) => item.reportType === "payments").flatMap((item) => item.rows).forEach((row) => {
-    if (row.transactionType !== "refund" && !Number.isFinite(row.refund)) return;
-    const refund = row.refund ?? row.amount;
-    if (Number.isFinite(refund)) getMonth(row.date).refunds += Math.abs(refund);
-  });
-  calculateReturns(imports).records.forEach((row) => { getMonth(row.date).returns += 1; });
-
-  return [...months.values()].sort((first, second) => first.month.localeCompare(second.month));
-}
-
-// Dated order rows per month, kept apart from the chart buckets so orders without a price don't add chart points.
-function getMonthlyOrders(imports) {
-  const counts = new Map();
-  imports.filter((item) => item.reportType === "orders").flatMap((item) => item.rows).forEach((row) => {
-    if (!/^\d{4}-\d{2}/.test(row.date || "")) return;
-    const month = row.date.slice(0, 7);
-    counts.set(month, (counts.get(month) ?? 0) + 1);
-  });
-  return [...counts].map(([month, orders]) => ({ month, orders })).sort((first, second) => first.month.localeCompare(second.month));
-}
-
 export default function DashboardPage() {
   const [intro] = useState(() => !introPlayed);
   useEffect(() => { introPlayed = true; }, []);
@@ -111,13 +81,19 @@ export default function DashboardPage() {
   const [aiError, setAiError] = useState("");
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [marketSeasonContext, setMarketSeasonContext] = useState("");
+  const [chat, setChat] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const chatAbort = useRef(null);
+  const scrollRef = useRef(null);
+  const stickToBottom = useRef(true);
   const [now] = useState(() => new Date());
   const audit = useMemo(() => calculatePaymentAudit(imports), [imports]);
   const returns = useMemo(() => calculateReturns(imports), [imports]);
-  const monthlyOrders = useMemo(() => getMonthlyOrders(imports), [imports]);
+  const monthlyOrders = useMemo(() => calculateMonthlyOrders(imports), [imports]);
   const inventory = useMemo(() => calculateInventoryInsights(imports), [imports]);
   const inventorySignature = useMemo(() => JSON.stringify(inventory), [inventory]);
-  const monthlyData = useMemo(() => getMonthlyData(imports), [imports]);
+  const workspace = useMemo(() => buildWorkspaceSummary(imports), [imports]);
+  const monthlyData = useMemo(() => calculateMonthlyTotals(imports), [imports]);
   const recentReturns = [...returns.records].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 5);
   const recentImports = [...imports].sort((a, b) => b.importedAt.localeCompare(a.importedAt)).slice(0, 4);
   const refundTotal = monthlyData.reduce((total, item) => total + item.refunds, 0);
@@ -150,6 +126,70 @@ export default function DashboardPage() {
       .catch(() => { if (active) setAiStatus("unavailable"); });
     return () => { active = false; };
   }, []);
+
+  const chatBusy = chat.at(-1)?.status === "streaming";
+
+  // Leaving the dashboard stops an answer that is still streaming.
+  useEffect(() => () => chatAbort.current?.abort(), []);
+
+  // Follow a streaming answer unless the reader has scrolled up to read something else.
+  useEffect(() => {
+    const panel = scrollRef.current;
+    if (panel && chat.length && stickToBottom.current) panel.scrollTop = panel.scrollHeight;
+  }, [chat]);
+
+  async function sendChat(text) {
+    const question = text.trim();
+    if (!question || chatBusy || aiStatus !== "ready") return;
+    const history = chatHistory([...chat, { role: "user", content: question }]);
+    // Only the answer still being written changes; after "New chat" or a finished answer, late updates are ignored.
+    const updateAnswer = (change) => setChat((current) => (current.at(-1)?.status === "streaming" ? [...current.slice(0, -1), change(current.at(-1))] : current));
+    setChat((current) => [...current, { role: "user", content: question }, { role: "assistant", content: "", status: "streaming" }]);
+    setChatInput("");
+    stickToBottom.current = true;
+    const controller = new AbortController();
+    chatAbort.current = controller;
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ language, messages: history, workspace }),
+        signal: controller.signal,
+      });
+      if (!response.ok || !response.body) {
+        updateAnswer((answer) => applyChatEvent(answer, { type: "error", code: response.status === 503 ? "not_configured" : "unavailable" }));
+        return;
+      }
+      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+      let rest = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const chunk = readNdjson(rest, value);
+        rest = chunk.rest;
+        for (const event of chunk.events) updateAnswer((answer) => applyChatEvent(answer, event));
+      }
+      // A stream that ends without "done" (dropped connection) still leaves a finished, readable answer.
+      updateAnswer((answer) => applyChatEvent(answer, answer.content ? { type: "done" } : { type: "error", code: "connection" }));
+    } catch (requestError) {
+      if (requestError.name === "AbortError") {
+        setChat((current) => {
+          const answer = current.at(-1);
+          if (answer?.status !== "streaming") return current;
+          return answer.content ? [...current.slice(0, -1), applyChatEvent(answer, { type: "done" })] : current.slice(0, -1);
+        });
+      } else {
+        updateAnswer((answer) => applyChatEvent(answer, { type: "error", code: "connection" }));
+      }
+    } finally {
+      if (chatAbort.current === controller) chatAbort.current = null;
+    }
+  }
+
+  function resetChat() {
+    chatAbort.current?.abort();
+    setChat([]);
+  }
 
   async function analyzeInventory() {
     if (aiBusy || aiStatus !== "ready" || !inventory.length) return;
@@ -344,30 +384,27 @@ export default function DashboardPage() {
             <motion.aside className="dashboard-side" variants={rise} aria-labelledby="ai-panel-title">
               <Card className="dashboard-panel ai-panel">
                 <div className="ai-head">
-                  <span className={`ai-orb ${aiBusy ? "ai-orb-busy" : ""}`} aria-hidden="true" />
+                  <span className={`ai-orb ${aiBusy || chatBusy ? "ai-orb-busy" : ""}`} aria-hidden="true" />
                   <div>
                     <h2 id="ai-panel-title">{t("aiInventoryTitle")}</h2>
-                    <p><span className={`ai-status-dot ${aiReady ? "ai-status-ready" : ""}`} />{aiStatus === "checking" ? t("loading") : aiReady ? "DeepSeek" : t("aiNotConfigured")}</p>
+                    <p><span className={`ai-status-dot ${aiReady ? "ai-status-ready" : ""}`} />{aiStatus === "checking" ? t("loading") : aiReady ? "Claude Opus 5.5" : t("aiNotConfigured")}</p>
                   </div>
+                  {chat.length > 0 && <button type="button" className="icon-button ai-head-action" onClick={resetChat} aria-label={t("newChat")} title={t("newChat")}><MessageSquarePlus size={17} aria-hidden="true" /></button>}
                 </div>
-                <div className="ai-scroll" tabIndex={0} role="region" aria-labelledby="ai-panel-title">
-                  <div className="ai-live" aria-live="polite">
-                    <p className="ai-bubble">{analysis?.summary || t("aiInventoryDescription")}</p>
-                    {analysis && (
-                      <motion.div className="ai-result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: easeOut }}>
-                        {analysis.recommendations.map((recommendation, index) => (
-                          <article className="ai-recommendation" key={`${recommendation.title}-${index}`}>
-                            <div><strong>{recommendation.title}</strong><Badge tone={recommendation.confidence === "high" ? "success" : "neutral"}>{t(`confidence${recommendation.confidence}`)}</Badge></div>
-                            <p>{recommendation.action}</p>
-                            <small>{t("aiEvidence")}: {recommendation.evidence}</small>
-                          </article>
-                        ))}
-                      </motion.div>
-                    )}
-                  </div>
-                  {aiStatus === "missing" && <p className="ai-setup-note">{t("aiSetupHint")} <code>DEEPSEEK_API_KEY</code> {t("aiSetupHintEnd")}</p>}
+                <div
+                  className="ai-scroll"
+                  ref={scrollRef}
+                  tabIndex={0}
+                  role="region"
+                  aria-labelledby="ai-panel-title"
+                  onScroll={(event) => {
+                    const panel = event.currentTarget;
+                    stickToBottom.current = panel.scrollHeight - panel.scrollTop - panel.clientHeight < 120;
+                  }}
+                >
+                  <p className="ai-bubble">{t("aiInventoryDescription")}</p>
+                  {aiStatus === "missing" && <p className="ai-setup-note">{t("aiSetupHint")} <code>ANTHROPIC_API_KEY</code> {t("aiSetupHintEnd")}</p>}
                   {aiStatus === "unavailable" && <p className="ai-error" role="status">{t("aiStatusUnavailable")}</p>}
-                  {aiError && <p className="ai-error" role="alert">{aiError}</p>}
                   <h3 className="ai-section-title"><span className="ai-ring" aria-hidden="true" />{t("inventoryAnalyst")}<Badge tone="blue">{t("dataDriven")}</Badge></h3>
                   {inventory.length ? (
                     <ul className="ai-points">
@@ -380,13 +417,9 @@ export default function DashboardPage() {
                       ))}
                     </ul>
                   ) : <EmptyState title={t("noInventoryData")} description={t("inventoryImportHint")} action={<Link href="/import" className="text-link">{t("importData")}</Link>} />}
-                  <p className="analysis-disclaimer">{t("inventoryAnalysisDisclaimer")}</p>
-                </div>
-                <div className="ai-foot">
-                  <p className="analysis-disclaimer">{t("aiPrivacyDisclaimer")}</p>
-                  <form className="ai-composer" onSubmit={(event) => { event.preventDefault(); analyzeInventory(); }}>
-                    <span className="ai-composer-icon" aria-hidden="true"><Sparkles size={15} /></span>
+                  <form className="ai-analyze" onSubmit={(event) => { event.preventDefault(); analyzeInventory(); }}>
                     <input
+                      className="input"
                       type="text"
                       maxLength={200}
                       value={marketSeasonContext}
@@ -394,9 +427,72 @@ export default function DashboardPage() {
                       placeholder={t("marketSeasonPlaceholder")}
                       aria-label={t("marketSeasonContext")}
                     />
-                    <button type="submit" className="ai-send" disabled={!aiReady || aiBusy || !inventory.length} aria-label={aiBusy ? t("aiAnalyzing") : t("analyzeWithAi")} title={t("analyzeWithAi")}>
-                      {aiBusy ? <LoaderCircle className="spin" size={16} aria-hidden="true" /> : <SendHorizontal size={16} aria-hidden="true" />}
-                    </button>
+                    <Button type="submit" variant="secondary" disabled={!aiReady || aiBusy || !inventory.length}>
+                      {aiBusy ? <LoaderCircle className="spin" size={15} aria-hidden="true" /> : <Sparkles size={15} aria-hidden="true" />}{aiBusy ? t("aiAnalyzing") : t("analyzeWithAi")}
+                    </Button>
+                  </form>
+                  <div className="ai-live" aria-live="polite">
+                    {aiError && <p className="ai-error" role="alert">{aiError}</p>}
+                    {analysis && (
+                      <motion.div className="ai-result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: easeOut }}>
+                        <p className="ai-bubble">{analysis.summary}</p>
+                        {analysis.recommendations.map((recommendation, index) => (
+                          <article className="ai-recommendation" key={`${recommendation.title}-${index}`}>
+                            <div><strong>{recommendation.title}</strong><Badge tone={recommendation.confidence === "high" ? "success" : "neutral"}>{t(`confidence${recommendation.confidence}`)}</Badge></div>
+                            <p>{recommendation.action}</p>
+                            <small>{t("aiEvidence")}: {recommendation.evidence}</small>
+                          </article>
+                        ))}
+                      </motion.div>
+                    )}
+                  </div>
+                  <p className="analysis-disclaimer">{t("inventoryAnalysisDisclaimer")}</p>
+                  {/* aria-busy holds the announcement until the whole answer has arrived. */}
+                  <div className="ai-chat" role="log" aria-live="polite" aria-busy={chatBusy} aria-label={t("aiInventoryTitle")}>
+                    {chat.map((message, index) => (
+                      <motion.div
+                        key={index}
+                        className={`chat-msg ${message.role === "user" ? "chat-user" : "chat-claude"} ${message.status === "error" ? "chat-error" : ""}`}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2, ease: easeOut }}
+                      >
+                        <span className="sr-only">{message.role === "user" ? t("chatYou") : t("chatClaude")}: </span>
+                        {message.status === "error" ? t(`chatErrors.${message.errorCode}`)
+                          : message.status === "streaming" && !message.content ? <span className="chat-typing" aria-label={t("chatWriting")}><i /><i /><i /></span>
+                          : message.content}
+                        {message.truncated && <small className="chat-note">{t("chatTruncated")}</small>}
+                      </motion.div>
+                    ))}
+                  </div>
+                  {!chat.length && aiReady && hasData && (
+                    <div className="ai-suggestions">
+                      {t("chatSuggestions").map((suggestion) => <button type="button" className="ai-suggestion" key={suggestion} onClick={() => sendChat(suggestion)}>{suggestion}</button>)}
+                    </div>
+                  )}
+                </div>
+                <div className="ai-foot">
+                  <p className="analysis-disclaimer">{t("aiPrivacyDisclaimer")}</p>
+                  <form className="ai-composer" onSubmit={(event) => { event.preventDefault(); sendChat(chatInput); }}>
+                    <span className="ai-composer-icon" aria-hidden="true"><Sparkles size={15} /></span>
+                    <input
+                      type="text"
+                      maxLength={4000}
+                      value={chatInput}
+                      onChange={(event) => setChatInput(event.target.value)}
+                      placeholder={t("chatPlaceholder")}
+                      aria-label={t("chatPlaceholder")}
+                      disabled={!aiReady}
+                    />
+                    {chatBusy ? (
+                      <button type="button" className="ai-send" onClick={() => chatAbort.current?.abort()} aria-label={t("chatStop")} title={t("chatStop")}>
+                        <Square size={13} fill="currentColor" aria-hidden="true" />
+                      </button>
+                    ) : (
+                      <button type="submit" className="ai-send" disabled={!aiReady || !chatInput.trim()} aria-label={t("chatSend")} title={t("chatSend")}>
+                        <SendHorizontal size={16} aria-hidden="true" />
+                      </button>
+                    )}
                   </form>
                 </div>
               </Card>

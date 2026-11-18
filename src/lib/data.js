@@ -611,3 +611,83 @@ export function monthOverMonth(rows, key) {
   if (index(current.month) - index(previous.month) !== 1) return null;
   return latestChange([previous[key], current[key]]);
 }
+
+// Chart buckets per "YYYY-MM" ("Undated" sorts last): only finite revenue, refunds and return records create a month.
+export function calculateMonthlyTotals(imports) {
+  const months = new Map();
+  const getMonth = (date) => {
+    const key = /^\d{4}-\d{2}/.test(date || "") ? date.slice(0, 7) : "Undated";
+    if (!months.has(key)) months.set(key, { month: key, revenue: 0, refunds: 0, returns: 0 });
+    return months.get(key);
+  };
+
+  imports.filter((item) => item.reportType === "orders").flatMap((item) => item.rows).forEach((row) => {
+    const revenue = row.amount ?? (Number.isFinite(row.unitPrice) && Number.isFinite(row.quantity) ? row.unitPrice * row.quantity : null);
+    if (Number.isFinite(revenue)) getMonth(row.date).revenue += revenue;
+  });
+  imports.filter((item) => item.reportType === "payments").flatMap((item) => item.rows).forEach((row) => {
+    if (row.transactionType !== "refund" && !Number.isFinite(row.refund)) return;
+    const refund = row.refund ?? row.amount;
+    if (Number.isFinite(refund)) getMonth(row.date).refunds += Math.abs(refund);
+  });
+  calculateReturns(imports).records.forEach((row) => { getMonth(row.date).returns += 1; });
+
+  return [...months.values()].sort((first, second) => first.month.localeCompare(second.month));
+}
+
+// Dated order rows per month, kept apart from the chart buckets so orders without a price don't add chart points.
+export function calculateMonthlyOrders(imports) {
+  const counts = new Map();
+  imports.filter((item) => item.reportType === "orders").flatMap((item) => item.rows).forEach((row) => {
+    if (!/^\d{4}-\d{2}/.test(row.date || "")) return;
+    const month = row.date.slice(0, 7);
+    counts.set(month, (counts.get(month) ?? 0) + 1);
+  });
+  return [...counts].map(([month, orders]) => ({ month, orders })).sort((first, second) => first.month.localeCompare(second.month));
+}
+
+const roundTo = (value, places = 2) => (Number.isFinite(value) ? Math.round(value * 10 ** places) / 10 ** places : null);
+
+// What the AI assistant may see: aggregates, product names and SKUs only. Customer names, contacts,
+// IDs and free-text feedback never leave the browser.
+export function buildWorkspaceSummary(imports) {
+  const orders = new Map(calculateMonthlyOrders(imports).map((item) => [item.month, item.orders]));
+  const audit = calculatePaymentAudit(imports);
+  const returns = calculateReturns(imports);
+  return {
+    reportRows: imports.reduce((counts, item) => ({ ...counts, [item.reportType]: (counts[item.reportType] ?? 0) + item.rows.length }), {}),
+    monthly: calculateMonthlyTotals(imports).slice(-18).map((item) => ({
+      month: item.month,
+      revenue: roundTo(item.revenue),
+      refunds: roundTo(item.refunds),
+      returns: item.returns,
+      orders: orders.get(item.month) ?? 0,
+    })),
+    payments: {
+      ordersChecked: audit.orderCount,
+      matched: audit.matchedCount,
+      discrepancyCount: audit.discrepancyCount,
+      expectedTotal: roundTo(audit.expectedTotal),
+      recordedTotal: roundTo(audit.actualTotal),
+      netDifference: roundTo(audit.differenceTotal),
+    },
+    returns: {
+      totalReturns: returns.totalReturns,
+      returnRatePercent: returns.returnRate === null ? null : roundTo(returns.returnRate * 100, 1),
+      returnedOrders: returns.returnedOrderCount,
+      orders: returns.orderCount,
+      reasons: [...returns.categoryCounts].sort((first, second) => second.value - first.value).slice(0, 8),
+      mostReturnedProducts: returns.productCounts.slice(0, 10),
+    },
+    inventory: calculateInventoryInsights(imports).slice(0, 25).map((item) => ({
+      name: item.name,
+      sku: item.sku,
+      stock: item.stock,
+      averageMonthlyDemand: roundTo(item.averageMonthlyDemand, 1),
+      latestMonth: item.latestMonth,
+      latestUnits: item.latestUnits,
+      change: roundTo(item.change),
+    })),
+    currency: "Amounts use the units and currency of the source reports; nothing is converted.",
+  };
+}
