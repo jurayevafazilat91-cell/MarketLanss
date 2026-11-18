@@ -1,7 +1,9 @@
 import { z } from "zod";
 
 // Free tier on Google AI Studio. Prompts sent on the free tier may be used by Google to improve its products.
-export const GEMINI_MODEL = "gemini-3.5-flash-lite";
+// Main model first, backup second. Both are free on the Gemini API free tier; the backup has much more
+// generous limits, so it keeps the app answering when the main model's free quota runs out.
+export const GEMINI_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash-lite"];
 
 const languageNames = { en: "English", ru: "Russian", uz: "Uzbek" };
 const languageSchema = z.enum(["en", "ru", "uz"]);
@@ -60,9 +62,9 @@ export const chatRequestSchema = z.object({
   workspace: z.record(z.string(), z.unknown()),
 });
 
-export function buildInventoryAnalysisRequest({ language, marketSeasonContext, products, currentMonth }) {
+export function buildInventoryAnalysisRequest({ language, marketSeasonContext, products, currentMonth }, model = GEMINI_MODELS[0]) {
   return {
-    model: GEMINI_MODEL,
+    model,
     store: false,
     system_instruction: [
       "You are a cautious inventory analyst for a small marketplace seller.",
@@ -108,9 +110,9 @@ function chatInstruction(language, workspace) {
   ].join("\n");
 }
 
-export function buildChatRequest({ language, messages, workspace }) {
+export function buildChatRequest({ language, messages, workspace }, model = GEMINI_MODELS[0]) {
   return {
-    model: GEMINI_MODEL,
+    model,
     stream: true,
     store: false,
     system_instruction: chatInstruction(language, workspace),
@@ -129,7 +131,8 @@ export function geminiErrorCode(error) {
   if (status === 429) return "rate_limit";
   if (status !== undefined) {
     console.error(`Gemini request failed with HTTP ${status}.`);
-    return "unavailable";
+    // A missing model or a server-side failure may be fixed by the backup model; a rejected request (400) may not.
+    return status === 404 || status >= 500 ? "unavailable" : "unknown";
   }
   if (error?.constructor?.name === "APIConnectionError" || error?.constructor?.name === "APIConnectionTimeoutError") return "connection";
   console.error("Gemini request failed.", error);
@@ -159,6 +162,70 @@ export async function* streamChatEvents(stream) {
     yield wroteText ? { type: "done" } : { type: "error", code: "connection" };
   } catch (error) {
     yield { type: "error", code: geminiErrorCode(error) };
+  }
+}
+
+const FALLBACK_CODES = new Set(["rate_limit", "unavailable"]);
+
+// Remembers when the main model last failed so the next requests skip it for a while instead of
+// each paying for a failed attempt first. Best effort: serverless instances keep their own memory.
+export function createModelPicker(models = GEMINI_MODELS, cooldownMs = 60000) {
+  let skipMainUntil = 0;
+  return {
+    order: (now = Date.now()) => (models.length > 1 && now < skipMainUntil ? models.slice(1) : models),
+    failed(model, now = Date.now()) {
+      if (model === models[0]) skipMainUntil = now + cooldownMs;
+    },
+  };
+}
+
+const defaultPicker = createModelPicker();
+
+// Runs a non-streaming request on the main model, then the backup if the main one is out of quota,
+// missing, or down. Key and request problems are not retried: the backup would fail the same way.
+export async function generateWithFallback(create, picker = defaultPicker, now = Date.now()) {
+  const models = picker.order(now);
+  for (const [index, model] of models.entries()) {
+    const last = index === models.length - 1;
+    try {
+      const interaction = await create(model);
+      if (interaction?.status === "completed" || last) return interaction;
+    } catch (error) {
+      if (last || !FALLBACK_CODES.has(geminiErrorCode(error))) throw error;
+    }
+    picker.failed(model, now);
+  }
+}
+
+async function* openAndStream(open, model) {
+  let stream;
+  try {
+    stream = await open(model);
+  } catch (error) {
+    yield { type: "error", code: geminiErrorCode(error) };
+    return;
+  }
+  yield* streamChatEvents(stream);
+}
+
+// Streams a chat answer, retrying on the backup model only while nothing has been shown yet.
+// Once text has started, a failure is reported instead, so the answer never mixes two models.
+export async function* streamChatWithFallback(open, picker = defaultPicker, now = Date.now()) {
+  const models = picker.order(now);
+  for (const [index, model] of models.entries()) {
+    const last = index === models.length - 1;
+    let wroteText = false;
+    let retry = false;
+    for await (const event of openAndStream(open, model)) {
+      if (event.type === "error" && !last && !wroteText && FALLBACK_CODES.has(event.code)) {
+        retry = true;
+        break;
+      }
+      if (event.type === "text") wroteText = true;
+      yield event;
+    }
+    if (!retry) return;
+    picker.failed(model, now);
   }
 }
 
