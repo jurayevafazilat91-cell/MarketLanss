@@ -237,14 +237,14 @@ export default function DashboardPage() {
               <stop offset="100%" style={{ stopColor: "var(--chart-1)", stopOpacity: 0 }} />
             </linearGradient>
             <linearGradient id="refundFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" style={{ stopColor: "var(--chart-2)", stopOpacity: 0.2 }} />
+              <stop offset="0%" style={{ stopColor: "var(--chart-2)", stopOpacity: 0.12 }} />
               <stop offset="100%" style={{ stopColor: "var(--chart-2)", stopOpacity: 0 }} />
             </linearGradient>
           </defs>
           {axes}
-          <Area type="linear" dataKey="refunds" yAxisId="money" name={t("refunds")} stroke="var(--chart-2)" strokeWidth={1.5} strokeOpacity={0.75} fill="url(#refundFill)" dot={false} isAnimationActive={intro ? "auto" : false} animationBegin={150} animationDuration={700} animationEasing="ease-out" />
+          <Area type="linear" dataKey="refunds" yAxisId="money" name={t("refunds")} stroke="var(--chart-2)" strokeWidth={1.5} strokeOpacity={0.55} fill="url(#refundFill)" dot={false} isAnimationActive={intro ? "auto" : false} animationBegin={150} animationDuration={700} animationEasing="ease-out" />
           <Area type="linear" dataKey="revenue" yAxisId="money" name={t("revenue")} stroke="var(--chart-1)" strokeWidth={2.25} fill="url(#revenueFill)" dot={{ r: 3, fill: "var(--chart-dot)", stroke: "var(--chart-1)", strokeWidth: 1.5 }} activeDot={{ r: 5, fill: "var(--chart-dot)", stroke: "var(--chart-1)", strokeWidth: 2 }} isAnimationActive={intro ? "auto" : false} animationBegin={150} animationDuration={700} animationEasing="ease-out" />
-          <Line type="linear" dataKey="returns" yAxisId="count" name={t("returnsTotal")} stroke="var(--chart-3)" strokeWidth={1.5} strokeDasharray="4 4" dot={false} isAnimationActive={intro ? "auto" : false} animationBegin={150} animationDuration={700} animationEasing="ease-out" />
+          <Line type="linear" dataKey="returns" yAxisId="count" name={t("returnsTotal")} stroke="var(--chart-3)" strokeWidth={1.25} strokeOpacity={0.55} strokeDasharray="4 4" dot={false} isAnimationActive={intro ? "auto" : false} animationBegin={150} animationDuration={700} animationEasing="ease-out" />
         </ComposedChart>
       </ResponsiveContainer>
     );
@@ -259,7 +259,7 @@ export default function DashboardPage() {
         <div><p className="page-date">{today}</p><h1>{t("welcomeBack")}</h1></div>
         <div className="page-actions">
           <Link href="/import" className="button button-secondary"><FileUp size={15} />{t("importData")}</Link>
-          <Button onClick={loadDemo} disabled={busy}><ArrowDownToLine size={15} />{busy ? t("loading") : t("loadDemo")}</Button>
+          <Button variant="secondary" onClick={loadDemo} disabled={busy}><ArrowDownToLine size={15} />{busy ? t("loading") : t("loadDemo")}</Button>
         </div>
       </div>
       <ErrorMessage>{error}</ErrorMessage>
@@ -368,6 +368,7 @@ export default function DashboardPage() {
                   <p className="analysis-disclaimer">{t("inventoryAnalysisDisclaimer")}</p>
                 </div>
                 <div className="ai-foot">
+                  <p className="analysis-disclaimer">{t("aiPrivacyDisclaimer")}</p>
                   <form className="ai-composer" onSubmit={(event) => { event.preventDefault(); analyzeInventory(); }}>
                     <span className="ai-composer-icon" aria-hidden="true"><Sparkles size={15} /></span>
                     <input
@@ -382,7 +383,6 @@ export default function DashboardPage() {
                       {aiBusy ? <LoaderCircle className="spin" size={16} aria-hidden="true" /> : <SendHorizontal size={16} aria-hidden="true" />}
                     </button>
                   </form>
-                  <p className="analysis-disclaimer">{t("aiPrivacyDisclaimer")}</p>
                 </div>
               </Card>
             </motion.aside>
