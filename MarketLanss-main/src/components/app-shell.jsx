@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { Activity, CircleHelp, FileClock, Languages, LayoutGrid, Moon, Package, Settings, Undo2, Upload, Wallet } from "lucide-react";
 import { AppProvider, useApp } from "@/components/app-context";
@@ -43,6 +43,8 @@ function ThemeToggle({ label }) {
 function ShellContent({ children }) {
   const pathname = usePathname();
   const { t, ready, error, toast, language, setLanguage, imports } = useApp();
+  // Screen readers pick the voice from <html lang>; keep it in step with the UI language.
+  useEffect(() => { document.documentElement.lang = language; }, [language]);
 
   if (!ready) return <div className="full-loading"><LoadingState label={t("loading")} /></div>;
   if (error) return <div className="full-loading"><div className="message message-error">{t("loadError")} {error}<p>Start the app with <code>npm run dev</code> to use local storage.</p></div></div>;
@@ -90,11 +92,13 @@ function ShellContent({ children }) {
       </div>
       <AnimatePresence>
         {toast && (
-          <motion.div className="toast" role="status" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} transition={{ duration: 0.22, ease: easeOut }}>
+          <motion.div className="toast" aria-hidden="true" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} transition={{ duration: 0.22, ease: easeOut }}>
             {toast}
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Always mounted so the announcement is a content change screen readers notice. */}
+      <div className="sr-only" role="status">{toast}</div>
     </div>
   );
 }
