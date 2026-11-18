@@ -44,7 +44,7 @@ import {
 import { useApp } from "@/components/app-context";
 import { CountUp, easeOut, rise, stagger } from "@/components/motion";
 import { Badge, Button, Card, EmptyState, ErrorMessage, formatDate, formatMoney } from "@/components/ui";
-import { calculateInventoryInsights, calculatePaymentAudit, calculateReturns, latestChange } from "@/lib/data";
+import { calculateInventoryInsights, calculatePaymentAudit, calculateReturns, monthOverMonth } from "@/lib/data";
 import { createDemoImports } from "@/lib/demo";
 import { formatUzbekDate, translateReport } from "@/lib/translations";
 
@@ -70,15 +70,13 @@ function getMonthlyData(imports) {
   const months = new Map();
   const getMonth = (date) => {
     const key = /^\d{4}-\d{2}/.test(date || "") ? date.slice(0, 7) : "Undated";
-    if (!months.has(key)) months.set(key, { month: key, revenue: 0, refunds: 0, returns: 0, orders: 0 });
+    if (!months.has(key)) months.set(key, { month: key, revenue: 0, refunds: 0, returns: 0 });
     return months.get(key);
   };
 
   imports.filter((item) => item.reportType === "orders").flatMap((item) => item.rows).forEach((row) => {
     const revenue = row.amount ?? (Number.isFinite(row.unitPrice) && Number.isFinite(row.quantity) ? row.unitPrice * row.quantity : null);
-    const month = getMonth(row.date);
-    month.orders += 1;
-    if (Number.isFinite(revenue)) month.revenue += revenue;
+    if (Number.isFinite(revenue)) getMonth(row.date).revenue += revenue;
   });
   imports.filter((item) => item.reportType === "payments").flatMap((item) => item.rows).forEach((row) => {
     if (row.transactionType !== "refund" && !Number.isFinite(row.refund)) return;
@@ -88,6 +86,17 @@ function getMonthlyData(imports) {
   calculateReturns(imports).records.forEach((row) => { getMonth(row.date).returns += 1; });
 
   return [...months.values()].sort((first, second) => first.month.localeCompare(second.month));
+}
+
+// Dated order rows per month, kept apart from the chart buckets so orders without a price don't add chart points.
+function getMonthlyOrders(imports) {
+  const counts = new Map();
+  imports.filter((item) => item.reportType === "orders").flatMap((item) => item.rows).forEach((row) => {
+    if (!/^\d{4}-\d{2}/.test(row.date || "")) return;
+    const month = row.date.slice(0, 7);
+    counts.set(month, (counts.get(month) ?? 0) + 1);
+  });
+  return [...counts].map(([month, orders]) => ({ month, orders })).sort((first, second) => first.month.localeCompare(second.month));
 }
 
 export default function DashboardPage() {
@@ -103,8 +112,9 @@ export default function DashboardPage() {
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [marketSeasonContext, setMarketSeasonContext] = useState("");
   const [now] = useState(() => new Date());
-  const audit = calculatePaymentAudit(imports);
-  const returns = calculateReturns(imports);
+  const audit = useMemo(() => calculatePaymentAudit(imports), [imports]);
+  const returns = useMemo(() => calculateReturns(imports), [imports]);
+  const monthlyOrders = useMemo(() => getMonthlyOrders(imports), [imports]);
   const inventory = useMemo(() => calculateInventoryInsights(imports), [imports]);
   const inventorySignature = useMemo(() => JSON.stringify(inventory), [inventory]);
   const monthlyData = useMemo(() => getMonthlyData(imports), [imports]);
@@ -120,11 +130,13 @@ export default function DashboardPage() {
   // Compare full months only: the month in progress would always look like a drop. ("Undated" sorts after any date, so it is excluded too.)
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const dated = monthlyData.filter((item) => item.month < currentMonth);
+  const fullOrderMonths = monthlyOrders.filter((item) => item.month < currentMonth);
+  const orderMonthSet = new Set(fullOrderMonths.map((item) => item.month));
   const kpis = [
-    { label: t("revenue"), note: t("grossFromOrders"), value: revenueTotal, kind: "money", icon: Banknote, glow: "var(--accent)", change: latestChange(dated.map((item) => item.revenue)) },
-    { label: t("refunds"), note: t("refundsFromReports"), value: refundTotal, kind: "money", icon: Undo2, glow: "var(--violet)", change: latestChange(dated.map((item) => item.refunds)), upIsBad: true },
-    { label: t("returnRate"), note: `${returns.totalReturns} ${t("returnsTotal").toLowerCase()}`, value: returns.returnRate === null ? null : returns.returnRate * 100, kind: "percent", icon: Percent, glow: "var(--teal)", change: null },
-    { label: t("orders"), note: `${imports.filter((item) => item.reportType === "orders").length} ${t("ordersReport").toLowerCase()}`, value: audit.orderCount, kind: "integer", icon: ShoppingCart, glow: "var(--indigo)", change: latestChange(dated.map((item) => item.orders)) },
+    { id: "revenue", label: t("revenue"), note: t("grossFromOrders"), value: revenueTotal, kind: "money", icon: Banknote, glow: "var(--accent)", change: monthOverMonth(dated.filter((item) => orderMonthSet.has(item.month)), "revenue") },
+    { id: "refunds", label: t("refunds"), note: t("refundsFromReports"), value: refundTotal, kind: "money", icon: Undo2, glow: "var(--violet)", change: monthOverMonth(dated.filter((item) => item.refunds > 0), "refunds"), upIsBad: true },
+    { id: "returnRate", label: t("returnRate"), note: `${returns.totalReturns} ${t("returnsTotal").toLowerCase()}`, value: returns.returnRate === null ? null : returns.returnRate * 100, kind: "percent", icon: Percent, glow: "var(--teal)", change: null },
+    { id: "orders", label: t("orders"), note: `${imports.filter((item) => item.reportType === "orders").length} ${t("ordersReport").toLowerCase()}`, value: audit.orderCount, kind: "integer", icon: ShoppingCart, glow: "var(--indigo)", change: monthOverMonth(fullOrderMonths, "orders") },
   ];
 
   useEffect(() => {
@@ -274,7 +286,7 @@ export default function DashboardPage() {
               const up = kpi.change > 0;
               const tone = kpi.change === 0 ? "kpi-flat" : up === Boolean(kpi.upIsBad) ? "kpi-bad" : "";
               return (
-                <motion.article className="card kpi-card" style={{ "--glow": kpi.glow }} variants={rise} key={kpi.label}>
+                <motion.article className="card kpi-card" style={{ "--glow": kpi.glow }} variants={rise} key={kpi.id}>
                   <span className="kpi-icon"><Icon size={16} aria-hidden="true" /></span>
                   <span className="kpi-label" title={kpi.note}><span>{kpi.label}</span><Info size={13} aria-hidden="true" /></span>
                   <strong className="kpi-value">{kpi.value === null ? "—" : <CountUp value={kpi.value} from={intro ? 0 : kpi.value} kind={kpi.kind} language={language} />}</strong>
@@ -311,13 +323,14 @@ export default function DashboardPage() {
                         <tbody>
                           {latestTransactions.map((row, index) => {
                             const amount = row.amount ?? row.refund ?? row.fee;
-                            const down = amount < 0;
+                            const known = Number.isFinite(amount);
+                            const down = known && amount < 0;
                             return (
                               <tr key={`${row.orderId}-${row.date}-${index}`}>
                                 <td className="table-primary"><span className="order-cell"><span className="order-chip"><ReceiptText size={14} aria-hidden="true" /></span>{row.orderId || t("unavailable")}</span></td>
                                 <td>{formatDate(row.date, language)}</td>
-                                <td className={down ? "negative-value" : "positive-value"}>{down ? "" : "+"}{formatMoney(amount, language)}</td>
-                                <td><span className={`trend-cell ${down ? "trend-down" : ""}`}>{down ? <ArrowDownRight size={14} aria-hidden="true" /> : <ArrowUpRight size={14} aria-hidden="true" />}{transactionTypes.includes(row.transactionType) ? t(`transactionTypes.${row.transactionType}`) : row.transactionType || t("payment")}</span></td>
+                                <td className={known ? (down ? "negative-value" : "positive-value") : ""}>{known ? `${down ? "" : "+"}${formatMoney(amount, language)}` : "—"}</td>
+                                <td><span className={`trend-cell ${down ? "trend-down" : ""}`}>{known && (down ? <ArrowDownRight size={14} aria-hidden="true" /> : <ArrowUpRight size={14} aria-hidden="true" />)}{transactionTypes.includes(row.transactionType) ? t(`transactionTypes.${row.transactionType}`) : row.transactionType || t("payment")}</span></td>
                               </tr>
                             );
                           })}
@@ -338,10 +351,8 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="ai-scroll" tabIndex={0} role="region" aria-labelledby="ai-panel-title">
-                  <p className="ai-bubble" aria-live="polite">{analysis?.summary || t("aiInventoryDescription")}</p>
-                  {aiStatus === "missing" && <p className="ai-setup-note">{t("aiSetupHint")} <code>DEEPSEEK_API_KEY</code> {t("aiSetupHintEnd")}</p>}
-                  {aiStatus === "unavailable" && <p className="ai-error" role="status">{t("aiStatusUnavailable")}</p>}
-                  {aiError && <p className="ai-error" role="alert">{aiError}</p>}
+                  <div className="ai-live" aria-live="polite">
+                    <p className="ai-bubble">{analysis?.summary || t("aiInventoryDescription")}</p>
                     {analysis && (
                       <motion.div className="ai-result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: easeOut }}>
                         {analysis.recommendations.map((recommendation, index) => (
@@ -353,6 +364,10 @@ export default function DashboardPage() {
                         ))}
                       </motion.div>
                     )}
+                  </div>
+                  {aiStatus === "missing" && <p className="ai-setup-note">{t("aiSetupHint")} <code>DEEPSEEK_API_KEY</code> {t("aiSetupHintEnd")}</p>}
+                  {aiStatus === "unavailable" && <p className="ai-error" role="status">{t("aiStatusUnavailable")}</p>}
+                  {aiError && <p className="ai-error" role="alert">{aiError}</p>}
                   <h3 className="ai-section-title"><span className="ai-ring" aria-hidden="true" />{t("inventoryAnalyst")}<Badge tone="blue">{t("dataDriven")}</Badge></h3>
                   {inventory.length ? (
                     <ul className="ai-points">

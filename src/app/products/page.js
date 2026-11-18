@@ -60,9 +60,11 @@ export default function ProductsPage() {
   const [search, setSearch] = useState("");
   const [selectedKey, setSelectedKey] = useState("");
   const dialogRef = useRef(null);
+  const savingRef = useRef(false);
   const [period, setPeriod] = useState("week");
   const [stockDraft, setStockDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  useEffect(() => { savingRef.current = saving; }, [saving]);
   const [error, setError] = useState("");
   const products = useMemo(
     () => calculateProductCatalog(imports, stockOverrides),
@@ -83,11 +85,12 @@ export default function ProductsPage() {
     const dialog = dialogRef.current;
     dialog?.querySelector("button")?.focus();
     const onKey = (event) => {
-      if (event.key === "Escape") { setSelectedKey(""); return; }
+      if (event.key === "Escape") { if (!savingRef.current) setSelectedKey(""); return; }
       if (event.key !== "Tab" || !dialog) return;
       const focusable = dialog.querySelectorAll("button:not(:disabled), input:not(:disabled)");
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
+      if (!dialog.contains(document.activeElement)) { event.preventDefault(); first?.focus(); return; }
       if (event.shiftKey ? document.activeElement === first : document.activeElement === last) {
         event.preventDefault();
         (event.shiftKey ? last : first)?.focus();
