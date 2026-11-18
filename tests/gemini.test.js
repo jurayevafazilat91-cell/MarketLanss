@@ -1,14 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  GEMINI_MODELS,
   buildChatRequest,
   buildInventoryAnalysisRequest,
   chatRequestSchema,
+  createModelPicker,
+  generateWithFallback,
   geminiErrorCode,
   inventoryAnalysisRequestSchema,
   inventoryAnalysisResponseSchema,
   readAnalysis,
   streamChatEvents,
+  streamChatWithFallback,
 } from "../src/lib/gemini.js";
 
 const sampleProduct = {
@@ -79,14 +83,14 @@ test("inventory analysis response must follow the display shape", () => {
   }).success, false);
 });
 
-test("inventory analysis asks Gemini 3.5 Flash-Lite for schema-constrained JSON without storing the interaction", () => {
+test("inventory analysis asks Gemini 3.8 Flash for schema-constrained JSON without storing the interaction", () => {
   const request = buildInventoryAnalysisRequest({
     language: "ru",
     marketSeasonContext: "Northern Hemisphere",
     currentMonth: "2026-11",
     products: [sampleProduct],
   });
-  assert.equal(request.model, "gemini-3.5-flash-lite");
+  assert.equal(request.model, "gemini-3.8-flash");
   assert.equal(request.store, false);
   assert.equal("stream" in request, false);
   assert.equal(request.generation_config.thinking_level, "medium");
@@ -134,7 +138,7 @@ test("chat streams from Gemini with the conversation as input steps and the work
       { role: "user", content: "Why?" },
     ],
   });
-  assert.equal(request.model, "gemini-3.5-flash-lite");
+  assert.equal(request.model, "gemini-3.8-flash");
   assert.equal(request.stream, true);
   assert.equal(request.store, false);
   assert.equal(request.generation_config.thinking_level, "low");
@@ -204,4 +208,126 @@ test("thrown stream errors become error events", async (t) => {
   t.mock.method(console, "error", () => {});
   const events = await collect(streamChatEvents(failingStream(Object.assign(new Error("slow down"), { status: 429 }), [textDelta("x")])));
   assert.deepEqual(events.at(-1), { type: "error", code: "rate_limit" });
+});
+
+test("Gemini 3.8 Flash is the main model and 3.5 Flash-Lite the backup", () => {
+  assert.deepEqual(GEMINI_MODELS, ["gemini-3.8-flash", "gemini-3.5-flash-lite"]);
+});
+
+test("request builders send the model they are given", () => {
+  const analysis = buildInventoryAnalysisRequest({ language: "en", marketSeasonContext: "", currentMonth: "2026-11", products: [sampleProduct] }, "gemini-3.5-flash-lite");
+  const chat = buildChatRequest({ language: "en", workspace: {}, messages: [{ role: "user", content: "Hi" }] }, "gemini-3.5-flash-lite");
+  assert.equal(analysis.model, "gemini-3.5-flash-lite");
+  assert.equal(chat.model, "gemini-3.5-flash-lite");
+  // Both models accept these levels (3.8 Flash supports low, medium and high, and has no "minimal").
+  assert.ok(["low", "medium", "high"].includes(analysis.generation_config.thinking_level));
+  assert.ok(["low", "medium", "high"].includes(chat.generation_config.thinking_level));
+});
+
+test("the model picker skips the main model for a minute after it fails, then tries it again", () => {
+  const picker = createModelPicker(["main", "backup"], 60000);
+  assert.deepEqual(picker.order(1000), ["main", "backup"]);
+  picker.failed("backup", 1000);
+  assert.deepEqual(picker.order(1000), ["main", "backup"]);
+  picker.failed("main", 1000);
+  assert.deepEqual(picker.order(30000), ["backup"]);
+  assert.deepEqual(picker.order(61000), ["main", "backup"]);
+});
+
+const httpError = (status) => Object.assign(new Error("http " + status), { status });
+
+test("analysis falls back to the backup model when the main one is rate limited or down", async (t) => {
+  t.mock.method(console, "error", () => {});
+  for (const status of [429, 500, 503, 404]) {
+    const calls = [];
+    const interaction = await generateWithFallback(async (model) => {
+      calls.push(model);
+      if (model === "main") throw httpError(status);
+      return { status: "completed", output_text: "{}", model };
+    }, createModelPicker(["main", "backup"]));
+    assert.deepEqual(calls, ["main", "backup"], "status " + status);
+    assert.equal(interaction.model, "backup");
+  }
+});
+
+test("analysis falls back when the main model returns an unfinished interaction", async () => {
+  const interaction = await generateWithFallback(
+    async (model) => (model === "main" ? { status: "failed" } : { status: "completed", model }),
+    createModelPicker(["main", "backup"]),
+  );
+  assert.equal(interaction.model, "backup");
+});
+
+test("analysis does not fall back for key or request problems, and rethrows when every model fails", async (t) => {
+  t.mock.method(console, "error", () => {});
+  for (const status of [400, 401, 403]) {
+    const calls = [];
+    await assert.rejects(generateWithFallback(async (model) => { calls.push(model); throw httpError(status); }, createModelPicker(["main", "backup"])), { status });
+    assert.deepEqual(calls, ["main"], "status " + status);
+  }
+  await assert.rejects(generateWithFallback(async () => { throw httpError(429); }, createModelPicker(["main", "backup"])), { status: 429 });
+});
+
+test("analysis goes straight to the backup while the main model is cooling down", async (t) => {
+  t.mock.method(console, "error", () => {});
+  const picker = createModelPicker(["main", "backup"], 60000);
+  const calls = [];
+  const create = async (model) => { calls.push(model); if (model === "main") throw httpError(429); return { status: "completed" }; };
+  await generateWithFallback(create, picker, 1000);
+  await generateWithFallback(create, picker, 2000);
+  await generateWithFallback(create, picker, 70000);
+  assert.deepEqual(calls, ["main", "backup", "backup", "main", "backup"]);
+});
+
+const answer = (text) => fakeStream([textDelta(text), completed("completed")]);
+
+test("chat falls back when the main model cannot open the stream", async (t) => {
+  t.mock.method(console, "error", () => {});
+  const opened = [];
+  const events = await collect(streamChatWithFallback(async (model) => {
+    opened.push(model);
+    if (model === "main") throw httpError(429);
+    return answer("From the backup.");
+  }, createModelPicker(["main", "backup"])));
+  assert.deepEqual(opened, ["main", "backup"]);
+  assert.deepEqual(events, [{ type: "text", text: "From the backup." }, { type: "done" }]);
+});
+
+test("chat falls back when the main model fails before writing any text", async (t) => {
+  t.mock.method(console, "error", () => {});
+  const events = await collect(streamChatWithFallback(async (model) => (
+    model === "main" ? fakeStream([{ event_type: "error", error: { code: "UNAVAILABLE" } }]) : answer("Backup answer.")
+  ), createModelPicker(["main", "backup"])));
+  assert.deepEqual(events, [{ type: "text", text: "Backup answer." }, { type: "done" }]);
+});
+
+test("chat keeps the partial answer and reports the error when the main model fails mid-answer", async (t) => {
+  t.mock.method(console, "error", () => {});
+  const opened = [];
+  const events = await collect(streamChatWithFallback(async (model) => {
+    opened.push(model);
+    return failingStream(httpError(503), [textDelta("Half an ans")]);
+  }, createModelPicker(["main", "backup"])));
+  assert.deepEqual(opened, ["main"]);
+  assert.deepEqual(events, [{ type: "text", text: "Half an ans" }, { type: "error", code: "unavailable" }]);
+});
+
+test("chat does not fall back for key problems, and reports the last error when every model fails", async (t) => {
+  t.mock.method(console, "error", () => {});
+  const opened = [];
+  const auth = await collect(streamChatWithFallback(async (model) => { opened.push(model); throw httpError(401); }, createModelPicker(["main", "backup"])));
+  assert.deepEqual(auth, [{ type: "error", code: "auth" }]);
+  assert.deepEqual(opened, ["main"]);
+  const both = await collect(streamChatWithFallback(async () => { throw httpError(429); }, createModelPicker(["main", "backup"])));
+  assert.deepEqual(both, [{ type: "error", code: "rate_limit" }]);
+});
+
+test("chat goes straight to the backup while the main model is cooling down", async (t) => {
+  t.mock.method(console, "error", () => {});
+  const picker = createModelPicker(["main", "backup"], 60000);
+  const opened = [];
+  const open = async (model) => { opened.push(model); if (model === "main") throw httpError(429); return answer("ok"); };
+  await collect(streamChatWithFallback(open, picker, 1000));
+  await collect(streamChatWithFallback(open, picker, 2000));
+  assert.deepEqual(opened, ["main", "backup", "backup"]);
 });

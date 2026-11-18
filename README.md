@@ -43,7 +43,7 @@ Payments are matched by order ID. Expected values use order totals (or quantity 
 
 The dashboard's local stock signals use explainable rules over dated order quantities and imported stock levels. Treat these as directional indicators, not forecasts or purchase orders.
 
-The optional AI panel has two parts, both running on Google `gemini-3.5-flash-lite` through the official `@google/genai` SDK (Interactions API, `store: false`):
+The optional AI panel has two parts, both running on Google `gemini-3.8-flash` through the official `@google/genai` SDK (Interactions API, `store: false`). If the main model is out of free quota (HTTP 429), missing (404) or down (5xx), the request is retried on the backup `gemini-3.5-flash-lite`, and the main model is skipped for the next minute. Chat falls back only while no text has been shown, so one answer never mixes two models. Key and request errors are not retried. Both models are listed in `GEMINI_MODELS` in `src/lib/gemini.js`:
 
 - **Chat** (`/api/chat`, streamed): ask about sales, returns, payments or stock. Gemini receives an aggregate workspace summary built by `buildWorkspaceSummary` in `src/lib/data.js` (monthly totals, payment check results, return reason counts, product names, SKUs and stock levels) plus the conversation. Customer names, contacts, IDs and feedback text are never sent.
 - **Stock analysis** (`/api/analytics`): product, stock and dated unit-sales data, returned as schema-constrained JSON and re-validated with Zod. Seasonality is considered only when the history or the seller-provided market context supports it.

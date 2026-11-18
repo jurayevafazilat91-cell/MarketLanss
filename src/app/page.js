@@ -387,7 +387,7 @@ export default function DashboardPage() {
                   <span className={`ai-orb ${aiBusy || chatBusy ? "ai-orb-busy" : ""}`} aria-hidden="true" />
                   <div>
                     <h2 id="ai-panel-title">{t("aiInventoryTitle")}</h2>
-                    <p><span className={`ai-status-dot ${aiReady ? "ai-status-ready" : ""}`} />{aiStatus === "checking" ? t("loading") : aiReady ? "Gemini 3.5 Flash-Lite" : t("aiNotConfigured")}</p>
+                    <p><span className={`ai-status-dot ${aiReady ? "ai-status-ready" : ""}`} />{aiStatus === "checking" ? t("loading") : aiReady ? "Gemini 3.8 Flash" : t("aiNotConfigured")}</p>
                   </div>
                   {chat.length > 0 && <button type="button" className="icon-button ai-head-action" onClick={resetChat} aria-label={t("newChat")} title={t("newChat")}><MessageSquarePlus size={17} aria-hidden="true" /></button>}
                 </div>

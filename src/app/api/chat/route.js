@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
-import { buildChatRequest, chatRequestSchema, geminiConfigured, geminiErrorCode, readJsonBody, streamChatEvents } from "@/lib/gemini";
+import { buildChatRequest, chatRequestSchema, geminiConfigured, readJsonBody, streamChatWithFallback } from "@/lib/gemini";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -10,6 +10,7 @@ function jsonResponse(data, status) {
 }
 
 // Streams newline-delimited JSON events ({type: "text" | "done" | "error"}) as Gemini writes the answer.
+// The main model answers; the backup model takes over only if the main one fails before any text appears.
 export async function POST(request) {
   const body = await readJsonBody(request, 200000);
   if (body.error) return jsonResponse({ error: body.error }, body.status);
@@ -21,21 +22,12 @@ export async function POST(request) {
   // Closing the tab or the browser cancelling the stream stops the Gemini request too.
   const cancel = new AbortController();
   const signal = AbortSignal.any([request.signal, cancel.signal]);
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const events = streamChatWithFallback((model) => ai.interactions.create(buildChatRequest(parsed.data, model), { fetchOptions: { signal } }));
   const encoder = new TextEncoder();
-  let events;
 
   return new Response(new ReadableStream({
     async pull(controller) {
-      if (!events) {
-        try {
-          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-          events = streamChatEvents(await ai.interactions.create(buildChatRequest(parsed.data), { fetchOptions: { signal } }));
-        } catch (error) {
-          controller.enqueue(encoder.encode(`${JSON.stringify({ type: "error", code: geminiErrorCode(error) })}\n`));
-          controller.close();
-          return;
-        }
-      }
       const { value, done } = await events.next();
       if (done) controller.close();
       else controller.enqueue(encoder.encode(`${JSON.stringify(value)}\n`));
