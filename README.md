@@ -17,9 +17,11 @@ Open `http://localhost:3000`. To create a production build, run `npm run build`,
 
 By default, the app stores imports and the selected interface language in `data/store.json` through the server-side `/api/store` route. To use MongoDB Atlas instead, copy `.env.example` to `.env.local`, set `MONGODB_URI` to your Atlas connection string, and optionally set `MONGODB_DB` (defaults to `marketplace_intelligence`). When `MONGODB_URI` is set, the app stores the dataset in the `app_store` collection; otherwise it uses the local JSON file. `LOCAL_STORE_PATH` changes the local file location.
 
-In Atlas, create a database user and allow network access from the machine running the app, then use the driver's connection string from Atlas. URL-encode special characters in the database user's password. Keep the actual URI in `.env.local`; never commit it or expose it through a `NEXT_PUBLIC_` variable. The `.env*` files are ignored by Git.
+In Atlas, create a database user with only the `readWrite` role on the app's database (not `atlasAdmin`) and allow network access from the machine running the app, then use the driver's connection string from Atlas. URL-encode special characters in the database user's password. Keep the actual URI in `.env.local`; never commit it or expose it through a `NEXT_PUBLIC_` variable. The `.env*` files are ignored by Git.
 
-This MVP stores one shared dataset and has no authentication or per-user data isolation. Do not expose it publicly or use it for multiple users until authentication and access controls are implemented.
+This MVP stores one shared dataset and has no user accounts or per-user data isolation. `src/proxy.js` guards every page and `/api/store` with one shared password (HTTP Basic Auth): set `APP_PASSWORD` in `.env.local` and in the Vercel project. Locally the app stays open without it; on Vercel it answers 503 until it is set. Do not use it for multiple users until real accounts and access controls are implemented.
+
+The whole workspace is saved in one request, so a save is refused with a clear message above 4 MB (Vercel accepts request bodies up to 4.5 MB, and MongoDB documents up to 16 MB). This fits roughly 10,000 order rows in total.
 
 ## Demo and sample files
 
@@ -62,7 +64,7 @@ npm run build
 
 ## Limitations
 
-- Local JSON and MongoDB Atlas storage in this MVP are for a single-user development/demo deployment; the app has no authenticated ownership or multi-user data isolation.
+- Local JSON and MongoDB Atlas storage in this MVP are for a single-user development/demo deployment; the app has one shared password, not user accounts or multi-user data isolation.
 - Login/register routes explain that authentication is not configured; they do not collect credentials.
 - Currency is not detected or converted. Amounts remain in the source report's units.
 - Matching and return categories are deterministic and depend on the imported fields and marketplace report semantics.
