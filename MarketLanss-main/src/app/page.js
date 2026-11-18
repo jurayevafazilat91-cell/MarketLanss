@@ -387,7 +387,7 @@ export default function DashboardPage() {
                   <span className={`ai-orb ${aiBusy || chatBusy ? "ai-orb-busy" : ""}`} aria-hidden="true" />
                   <div>
                     <h2 id="ai-panel-title">{t("aiInventoryTitle")}</h2>
-                    <p><span className={`ai-status-dot ${aiReady ? "ai-status-ready" : ""}`} />{aiStatus === "checking" ? t("loading") : aiReady ? "Claude Opus 5.5" : t("aiNotConfigured")}</p>
+                    <p><span className={`ai-status-dot ${aiReady ? "ai-status-ready" : ""}`} />{aiStatus === "checking" ? t("loading") : aiReady ? "Gemini 3.5 Flash-Lite" : t("aiNotConfigured")}</p>
                   </div>
                   {chat.length > 0 && <button type="button" className="icon-button ai-head-action" onClick={resetChat} aria-label={t("newChat")} title={t("newChat")}><MessageSquarePlus size={17} aria-hidden="true" /></button>}
                 </div>
@@ -403,7 +403,7 @@ export default function DashboardPage() {
                   }}
                 >
                   <p className="ai-bubble">{t("aiInventoryDescription")}</p>
-                  {aiStatus === "missing" && <p className="ai-setup-note">{t("aiSetupHint")} <code>ANTHROPIC_API_KEY</code> {t("aiSetupHintEnd")}</p>}
+                  {aiStatus === "missing" && <p className="ai-setup-note">{t("aiSetupHint")} <code>GEMINI_API_KEY</code> {t("aiSetupHintEnd")}</p>}
                   {aiStatus === "unavailable" && <p className="ai-error" role="status">{t("aiStatusUnavailable")}</p>}
                   <h3 className="ai-section-title"><span className="ai-ring" aria-hidden="true" />{t("inventoryAnalyst")}<Badge tone="blue">{t("dataDriven")}</Badge></h3>
                   {inventory.length ? (
@@ -452,12 +452,12 @@ export default function DashboardPage() {
                     {chat.map((message, index) => (
                       <motion.div
                         key={index}
-                        className={`chat-msg ${message.role === "user" ? "chat-user" : "chat-claude"} ${message.status === "error" ? "chat-error" : ""}`}
+                        className={`chat-msg ${message.role === "user" ? "chat-user" : "chat-assistant"} ${message.status === "error" ? "chat-error" : ""}`}
                         initial={{ opacity: 0, y: 6 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.2, ease: easeOut }}
                       >
-                        <span className="sr-only">{message.role === "user" ? t("chatYou") : t("chatClaude")}: </span>
+                        <span className="sr-only">{message.role === "user" ? t("chatYou") : t("chatAssistant")}: </span>
                         {message.status === "error" ? t(`chatErrors.${message.errorCode}`)
                           : message.status === "streaming" && !message.content ? <span className="chat-typing" aria-label={t("chatWriting")}><i /><i /><i /></span>
                           : message.content}

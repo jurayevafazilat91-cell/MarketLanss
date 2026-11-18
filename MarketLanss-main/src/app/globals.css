@@ -343,8 +343,8 @@ code { font-size: .92em; }
 .ai-chat:empty { display: none; }
 .chat-msg { max-width: 92%; padding: 10px 12px; border-radius: 14px; font-size: 13px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .chat-user { justify-self: end; border-bottom-right-radius: 4px; background: var(--accent); color: var(--on-accent); }
-.chat-claude { justify-self: start; border: 1px solid var(--line); border-bottom-left-radius: 4px; background: var(--neutral-soft); color: var(--text); }
-.chat-claude.chat-error { border-color: color-mix(in srgb, var(--red) 40%, transparent); background: var(--red-soft); color: var(--red); }
+.chat-assistant { justify-self: start; border: 1px solid var(--line); border-bottom-left-radius: 4px; background: var(--neutral-soft); color: var(--text); }
+.chat-assistant.chat-error { border-color: color-mix(in srgb, var(--red) 40%, transparent); background: var(--red-soft); color: var(--red); }
 .chat-note { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; }
 .chat-typing { display: inline-flex; gap: 4px; padding: 4px 0; }
 .chat-typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: chat-dot 1s ease-in-out infinite; }
