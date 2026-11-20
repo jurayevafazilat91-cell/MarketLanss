@@ -283,25 +283,30 @@ code { font-size: .92em; }
 .kpi-delta.kpi-bad { color: var(--red); }
 .kpi-delta.kpi-flat { color: var(--muted); }
 .kpi-delta.kpi-note { max-width: 150px; overflow: hidden; color: var(--muted); font-weight: 500; text-overflow: ellipsis; }
-.dashboard-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; }
 .dashboard-main { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-content: start; }
-.dashboard-side { position: relative; min-width: 0; }
 .dashboard-panel { min-width: 0; overflow: hidden; }
 .dashboard-panel .section-heading { border-bottom: 0; }
 .dashboard-panel .section-heading h2 { display: flex; align-items: center; gap: 8px; }
 .dashboard-panel .section-heading h2 svg { display: none; }
 .chart-panel { background: radial-gradient(90% 70% at 30% -25%, rgb(47 184 172 / calc(var(--glow-strength) * .32)), transparent 70%), var(--card-bg); }
-.dashboard-chart { height: 320px; padding: 4px 14px 14px 6px; }
+.dashboard-chart { height: 400px; padding: 4px 14px 14px 6px; }
 .dashboard-chart .empty-state, .returns-chart .empty-state { min-height: 100%; }
 .dashboard-chart .empty-state p { margin-bottom: 7px; }
-.dashboard-lower { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+/* Bottom margin keeps the last cards clear of the floating AI button. */
+.dashboard-lower { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 16px 0 64px; }
 .order-cell { display: flex; align-items: center; gap: 10px; }
 .order-chip { flex: 0 0 24px; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; color: var(--accent); background: var(--accent-soft); }
 .trend-cell { display: inline-flex; align-items: center; gap: 5px; color: var(--mint); font-weight: 500; }
 .trend-cell.trend-down { color: var(--red); }
 
-/* AI panel: fills the height of the left column on desktop, scrolls inside. */
-.ai-panel { position: absolute; inset: 0; display: flex; flex-direction: column; background: radial-gradient(80% 45% at 100% 0%, rgb(34 184 240 / calc(var(--glow-strength) * .28)), transparent 70%), var(--card-bg); }
+/* AI chat: a floating button opens a popover above it; the popover grows with the chat up to its max height. */
+.ai-fab { position: fixed; z-index: 30; right: 24px; bottom: 24px; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px 0 8px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface-3); color: var(--text); font-size: 13px; font-weight: 600; box-shadow: var(--pop-shadow); transition: border-color .15s ease, transform .12s var(--ease-out); }
+.ai-fab:active { transform: scale(.97); }
+.ai-fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ai-fab .ai-orb { flex-basis: 28px; width: 28px; height: 28px; }
+.ai-fab-icon { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--neutral-soft); color: var(--text-2); }
+.ai-panel { position: fixed; z-index: 30; right: 24px; bottom: 80px; width: min(380px, calc(100vw - 32px)); max-height: min(560px, calc(100dvh - 120px)); display: flex; flex-direction: column; overflow: hidden; transform-origin: bottom right; background: radial-gradient(80% 45% at 100% 0%, rgb(34 184 240 / calc(var(--glow-strength) * .28)), transparent 70%), var(--surface); box-shadow: var(--pop-shadow); }
+.ai-panel:focus { outline: none; }
 .ai-head { flex: 0 0 auto; display: flex; align-items: center; gap: 9px; padding: 10px 12px 4px; }
 .ai-orb { flex: 0 0 24px; width: 24px; height: 24px; border-radius: 50%; background: conic-gradient(from 0deg, #3ddc97, #22b8f0, #8f73f2, #3ddc97); box-shadow: inset 0 0 10px rgb(255 255 255 / .35), 0 0 18px rgb(34 184 240 / .35); }
 .ai-orb-busy { animation: orb-turn 1.6s linear infinite; }
@@ -481,6 +486,7 @@ code { font-size: .92em; }
   .recent-return-row:hover .recent-return-copy strong, .alert-row:hover strong { color: var(--accent-strong); }
   .product-view-switch button:hover, .product-period-switch button:hover { color: var(--text); }
   .ai-send:hover:not(:disabled) { background: var(--accent-strong); }
+  .ai-fab:hover { border-color: var(--accent); }
   .ai-scroll:hover { scrollbar-color: var(--line-strong) transparent; }
   .upload-drop input[type="file"]::file-selector-button:hover { border-color: var(--muted); }
 }
@@ -488,15 +494,12 @@ code { font-size: .92em; }
 @media (prefers-reduced-motion: reduce) {
   .ai-orb, .chat-typing i { animation: none; }
   .chat-typing i { opacity: .6; }
-  .button, .ai-send, .theme-switch::after { transition-duration: 0s; }
+  .button, .ai-send, .ai-fab, .theme-switch::after { transition-duration: 0s; }
 }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1180px) {
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .dashboard-layout { grid-template-columns: minmax(0, 1fr); }
-  .ai-panel { position: relative; inset: auto; }
-  .ai-scroll { max-height: 240px; }
   .dashboard-lower { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .returns-filters { grid-template-columns: repeat(3, minmax(130px, 1fr)); }
@@ -561,6 +564,8 @@ code { font-size: .92em; }
   .stat-card { min-height: 0; padding: 14px; }
   .stat-card strong { font-size: 21px; }
   .toast { right: 16px; bottom: 16px; }
+  .ai-fab { right: 16px; bottom: 16px; }
+  .ai-panel { right: 16px; left: 16px; bottom: 72px; width: auto; }
   /* 16px stops iOS Safari from zooming the page when a field takes focus. */
   .field input, .field select, .input, .select, .product-search input, .ai-composer input, .language-control select, .chart-type-control select { font-size: 16px; }
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -24,6 +24,7 @@ import {
   ShoppingCart,
   Square,
   Undo2,
+  X,
 } from "lucide-react";
 import {
   Area,
@@ -78,6 +79,10 @@ export default function DashboardPage() {
   const [chat, setChat] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const chatAbort = useRef(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  const fabRef = useRef(null);
+  const panelRef = useRef(null);
+  const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const stickToBottom = useRef(true);
   const [now] = useState(() => new Date());
@@ -128,7 +133,19 @@ export default function DashboardPage() {
   useEffect(() => {
     const panel = scrollRef.current;
     if (panel && chat.length && stickToBottom.current) panel.scrollTop = panel.scrollHeight;
-  }, [chat]);
+  }, [chat, aiOpen]);
+
+  // Opening puts the cursor in the question box; while AI is not configured the box is disabled, so the panel takes focus.
+  useEffect(() => {
+    if (!aiOpen) return;
+    const input = inputRef.current;
+    (input && !input.disabled ? input : panelRef.current)?.focus();
+  }, [aiOpen]);
+
+  function closeAi() {
+    setAiOpen(false);
+    fabRef.current?.focus();
+  }
 
   async function sendChat(text) {
     const question = text.trim();
@@ -297,49 +314,100 @@ export default function DashboardPage() {
               );
             })}
           </motion.div>
-          <div className="dashboard-layout">
-            <div className="dashboard-main">
-              <motion.div variants={rise}>
-                <Card className="dashboard-panel chart-panel">
-                  <div className="section-heading chart-heading">
-                    <div><h2>{t("salesReturnsOverview")}</h2><p>{t("salesReturnsDescription")}</p></div>
-                    <label className="chart-type-control"><span>{t("chartType")}</span><select value={chartType} onChange={(event) => setChartType(event.target.value)} aria-label={t("chartType")}>
-                      <option value="line">{t("lineChart")}</option><option value="bar">{t("barChart")}</option><option value="pie">{t("pieChart")}</option>
-                    </select></label>
+          <div className="dashboard-main">
+            <motion.div variants={rise}>
+              <Card className="dashboard-panel chart-panel">
+                <div className="section-heading chart-heading">
+                  <div><h2>{t("salesReturnsOverview")}</h2><p>{t("salesReturnsDescription")}</p></div>
+                  <label className="chart-type-control"><span>{t("chartType")}</span><select value={chartType} onChange={(event) => setChartType(event.target.value)} aria-label={t("chartType")}>
+                    <option value="line">{t("lineChart")}</option><option value="bar">{t("barChart")}</option><option value="pie">{t("pieChart")}</option>
+                  </select></label>
+                </div>
+                <div className="dashboard-chart">{chartContent()}</div>
+              </Card>
+            </motion.div>
+            <motion.div variants={rise}>
+              <Card className="dashboard-panel">
+                <div className="section-heading"><h2><ShoppingBag size={16} />{t("recentTransactions")}</h2><Link href="/auditor">{t("auditor")}<ChevronRight size={15} /></Link></div>
+                {latestTransactions.length ? (
+                  <div className="data-table-wrap">
+                    <table className="data-table">
+                      <thead><tr><th>{t("fields.orderId")}</th><th>{t("date")}</th><th>{t("fields.amount")}</th><th>{t("fields.transactionType")}</th></tr></thead>
+                      <tbody>
+                        {latestTransactions.map((row, index) => {
+                          const amount = row.amount ?? row.refund ?? row.fee;
+                          const known = Number.isFinite(amount);
+                          const down = known && amount < 0;
+                          return (
+                            <tr key={`${row.orderId}-${row.date}-${index}`}>
+                              <td className="table-primary"><span className="order-cell"><span className="order-chip"><ReceiptText size={14} aria-hidden="true" /></span>{row.orderId || t("unavailable")}</span></td>
+                              <td>{formatDate(row.date, language)}</td>
+                              <td className={known ? (down ? "negative-value" : "positive-value") : ""}>{known ? `${down ? "" : "+"}${formatMoney(amount, language)}` : "—"}</td>
+                              <td><span className={`trend-cell ${down ? "trend-down" : ""}`}>{known && (down ? <ArrowDownRight size={14} aria-hidden="true" /> : <ArrowUpRight size={14} aria-hidden="true" />)}{transactionTypes.includes(row.transactionType) ? t(`transactionTypes.${row.transactionType}`) : row.transactionType || t("payment")}</span></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                  <div className="dashboard-chart">{chartContent()}</div>
-                </Card>
-              </motion.div>
-              <motion.div variants={rise}>
-                <Card className="dashboard-panel">
-                  <div className="section-heading"><h2><ShoppingBag size={16} />{t("recentTransactions")}</h2><Link href="/auditor">{t("auditor")}<ChevronRight size={15} /></Link></div>
-                  {latestTransactions.length ? (
-                    <div className="data-table-wrap">
-                      <table className="data-table">
-                        <thead><tr><th>{t("fields.orderId")}</th><th>{t("date")}</th><th>{t("fields.amount")}</th><th>{t("fields.transactionType")}</th></tr></thead>
-                        <tbody>
-                          {latestTransactions.map((row, index) => {
-                            const amount = row.amount ?? row.refund ?? row.fee;
-                            const known = Number.isFinite(amount);
-                            const down = known && amount < 0;
-                            return (
-                              <tr key={`${row.orderId}-${row.date}-${index}`}>
-                                <td className="table-primary"><span className="order-cell"><span className="order-chip"><ReceiptText size={14} aria-hidden="true" /></span>{row.orderId || t("unavailable")}</span></td>
-                                <td>{formatDate(row.date, language)}</td>
-                                <td className={known ? (down ? "negative-value" : "positive-value") : ""}>{known ? `${down ? "" : "+"}${formatMoney(amount, language)}` : "—"}</td>
-                                <td><span className={`trend-cell ${down ? "trend-down" : ""}`}>{known && (down ? <ArrowDownRight size={14} aria-hidden="true" /> : <ArrowUpRight size={14} aria-hidden="true" />)}{transactionTypes.includes(row.transactionType) ? t(`transactionTypes.${row.transactionType}`) : row.transactionType || t("payment")}</span></td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : <p className="panel-empty">{t("noTransactions")}</p>}
-                </Card>
-              </motion.div>
-            </div>
-            <motion.aside className="dashboard-side" variants={rise} aria-labelledby="ai-panel-title">
-              <Card className="dashboard-panel ai-panel">
+                ) : <p className="panel-empty">{t("noTransactions")}</p>}
+              </Card>
+            </motion.div>
+          </div>
+          <motion.div className="dashboard-lower" variants={rise}>
+            <Card className="dashboard-panel">
+              <div className="section-heading"><h2><PackageSearch size={16} />{t("recentReturns")}</h2><Link href="/returns">{t("viewAll")}<ChevronRight size={15} /></Link></div>
+              {recentReturns.length ? <div className="recent-return-list">{recentReturns.map((row, index) => (
+                <Link href="/returns" className="recent-return-row" key={`${row._importId}-${row._rowIndex}`}>
+                  <span className="return-index">{String(index + 1).padStart(2, "0")}</span>
+                  <span className="recent-return-copy"><strong>{row.product || row.sku || row.orderId || t("unavailable")}</strong><small>{row.orderId || t("unavailable")}, {row.category}</small></span>
+                  <time>{formatDate(row.date, language)}</time>
+                </Link>
+              ))}</div> : <EmptyState title={t("noReturns")} description={t("importReturnsHint")} action={<Link href="/import" className="text-link">{t("importData")}</Link>} />}
+            </Card>
+            <Card className="dashboard-panel">
+              <div className="section-heading"><h2><AlertTriangle size={16} />{t("importantAlerts")}</h2></div>
+              <div className="alert-list">
+                <Link href="/auditor" className="alert-row">
+                  <span className={audit.discrepancyCount ? "alert-mark alert-warning" : "alert-mark alert-good"}><AlertTriangle size={15} /></span>
+                  <span><strong>{audit.hasUsableOrders && audit.hasUsablePayments ? `${audit.discrepancyCount} ${t("discrepancies").toLowerCase()}` : t("financialReportsNeeded")}</strong><small>{audit.hasUsableOrders && audit.hasUsablePayments ? t("paymentCheckHint") : t("financialReportsHint")}</small></span>
+                  <ArrowRight size={15} />
+                </Link>
+                {!imports.some((item) => item.reportType === "products") && <Link href="/import" className="alert-row">
+                  <span className="alert-mark alert-neutral"><Box size={15} /></span><span><strong>{t("inventoryReportMissing")}</strong><small>{t("inventoryImportHint")}</small></span><ArrowRight size={15} />
+                </Link>}
+              </div>
+            </Card>
+            <Card className="dashboard-panel">
+              <div className="section-heading"><h2><FileClock size={16} />{t("recentActivity")}</h2><Link href="/history">{t("history")}<ChevronRight size={15} /></Link></div>
+              <div className="recent-return-list">
+                {recentImports.map((item) => (
+                  <div className="recent-return-row" key={item.id}>
+                    <span className="activity-dot" /><span className="recent-return-copy"><strong>{item.fileName}</strong><small>{translateReport(t, item.reportType)}</small></span><time>{formatDate(item.importedAt, language)}</time>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </motion.div>
+        </motion.div>
+      )}
+      {hasData && (
+        <>
+          <AnimatePresence>
+            {aiOpen && (
+              <motion.section
+                id="ai-panel"
+                ref={panelRef}
+                className="card ai-panel"
+                role="dialog"
+                aria-labelledby="ai-panel-title"
+                tabIndex={-1}
+                onKeyDown={(event) => { if (event.key === "Escape") closeAi(); }}
+                initial={{ opacity: 0, scale: 0.96, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 8 }}
+                transition={{ duration: 0.18, ease: easeOut }}
+              >
                 <div className="ai-head">
                   <span className={`ai-orb ${chatBusy ? "ai-orb-busy" : ""}`} aria-hidden="true" />
                   <div>
@@ -381,6 +449,7 @@ export default function DashboardPage() {
                 <div className="ai-foot">
                   <form className="ai-composer" onSubmit={(event) => { event.preventDefault(); sendChat(chatInput); }}>
                     <input
+                      ref={inputRef}
                       type="text"
                       maxLength={4000}
                       value={chatInput}
@@ -400,45 +469,14 @@ export default function DashboardPage() {
                     )}
                   </form>
                 </div>
-              </Card>
-            </motion.aside>
-          </div>
-          <motion.div className="dashboard-lower" variants={rise}>
-            <Card className="dashboard-panel">
-              <div className="section-heading"><h2><PackageSearch size={16} />{t("recentReturns")}</h2><Link href="/returns">{t("viewAll")}<ChevronRight size={15} /></Link></div>
-              {recentReturns.length ? <div className="recent-return-list">{recentReturns.map((row, index) => (
-                <Link href="/returns" className="recent-return-row" key={`${row._importId}-${row._rowIndex}`}>
-                  <span className="return-index">{String(index + 1).padStart(2, "0")}</span>
-                  <span className="recent-return-copy"><strong>{row.product || row.sku || row.orderId || t("unavailable")}</strong><small>{row.orderId || t("unavailable")}, {row.category}</small></span>
-                  <time>{formatDate(row.date, language)}</time>
-                </Link>
-              ))}</div> : <EmptyState title={t("noReturns")} description={t("importReturnsHint")} action={<Link href="/import" className="text-link">{t("importData")}</Link>} />}
-            </Card>
-            <Card className="dashboard-panel">
-              <div className="section-heading"><h2><AlertTriangle size={16} />{t("importantAlerts")}</h2></div>
-              <div className="alert-list">
-                <Link href="/auditor" className="alert-row">
-                  <span className={audit.discrepancyCount ? "alert-mark alert-warning" : "alert-mark alert-good"}><AlertTriangle size={15} /></span>
-                  <span><strong>{audit.hasUsableOrders && audit.hasUsablePayments ? `${audit.discrepancyCount} ${t("discrepancies").toLowerCase()}` : t("financialReportsNeeded")}</strong><small>{audit.hasUsableOrders && audit.hasUsablePayments ? t("paymentCheckHint") : t("financialReportsHint")}</small></span>
-                  <ArrowRight size={15} />
-                </Link>
-                {!imports.some((item) => item.reportType === "products") && <Link href="/import" className="alert-row">
-                  <span className="alert-mark alert-neutral"><Box size={15} /></span><span><strong>{t("inventoryReportMissing")}</strong><small>{t("inventoryImportHint")}</small></span><ArrowRight size={15} />
-                </Link>}
-              </div>
-            </Card>
-            <Card className="dashboard-panel">
-              <div className="section-heading"><h2><FileClock size={16} />{t("recentActivity")}</h2><Link href="/history">{t("history")}<ChevronRight size={15} /></Link></div>
-              <div className="recent-return-list">
-                {recentImports.map((item) => (
-                  <div className="recent-return-row" key={item.id}>
-                    <span className="activity-dot" /><span className="recent-return-copy"><strong>{item.fileName}</strong><small>{translateReport(t, item.reportType)}</small></span><time>{formatDate(item.importedAt, language)}</time>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </motion.div>
-        </motion.div>
+              </motion.section>
+            )}
+          </AnimatePresence>
+          <button ref={fabRef} type="button" className="ai-fab" aria-expanded={aiOpen} aria-controls={aiOpen ? "ai-panel" : undefined} onClick={() => setAiOpen((open) => !open)}>
+            {aiOpen ? <span className="ai-fab-icon"><X size={15} aria-hidden="true" /></span> : <span className={`ai-orb ${chatBusy ? "ai-orb-busy" : ""}`} aria-hidden="true" />}
+            {t("aiInventoryTitle")}
+          </button>
+        </>
       )}
     </>
   );
