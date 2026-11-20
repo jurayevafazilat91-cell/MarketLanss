@@ -15,7 +15,6 @@ import {
   FileClock,
   FileUp,
   Info,
-  LoaderCircle,
   PackageSearch,
   MessageSquarePlus,
   Percent,
@@ -23,7 +22,6 @@ import {
   SendHorizontal,
   ShoppingBag,
   ShoppingCart,
-  Sparkles,
   Square,
   Undo2,
 } from "lucide-react";
@@ -45,8 +43,8 @@ import {
 } from "recharts";
 import { useApp } from "@/components/app-context";
 import { CountUp, easeOut, rise, stagger } from "@/components/motion";
-import { Badge, Button, Card, EmptyState, ErrorMessage, formatDate, formatMoney } from "@/components/ui";
-import { buildWorkspaceSummary, calculateInventoryInsights, calculateMonthlyOrders, calculateMonthlyTotals, calculatePaymentAudit, calculateReturns, monthOverMonth } from "@/lib/data";
+import { Button, Card, EmptyState, ErrorMessage, formatDate, formatMoney } from "@/components/ui";
+import { buildWorkspaceSummary, calculateMonthlyOrders, calculateMonthlyTotals, calculatePaymentAudit, calculateReturns, monthOverMonth } from "@/lib/data";
 import { applyChatEvent, chatHistory, readNdjson } from "@/lib/chat-stream";
 import { createDemoImports } from "@/lib/demo";
 import { formatUzbekDate, translateReport } from "@/lib/translations";
@@ -77,10 +75,6 @@ export default function DashboardPage() {
   const [busy, setBusy] = useState(false);
   const [chartType, setChartType] = useState("line");
   const [aiStatus, setAiStatus] = useState("checking");
-  const [aiBusy, setAiBusy] = useState(false);
-  const [aiError, setAiError] = useState("");
-  const [aiAnalysis, setAiAnalysis] = useState(null);
-  const [marketSeasonContext, setMarketSeasonContext] = useState("");
   const [chat, setChat] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const chatAbort = useRef(null);
@@ -90,8 +84,6 @@ export default function DashboardPage() {
   const audit = useMemo(() => calculatePaymentAudit(imports), [imports]);
   const returns = useMemo(() => calculateReturns(imports), [imports]);
   const monthlyOrders = useMemo(() => calculateMonthlyOrders(imports), [imports]);
-  const inventory = useMemo(() => calculateInventoryInsights(imports), [imports]);
-  const inventorySignature = useMemo(() => JSON.stringify(inventory), [inventory]);
   const workspace = useMemo(() => buildWorkspaceSummary(imports), [imports]);
   const monthlyData = useMemo(() => calculateMonthlyTotals(imports), [imports]);
   const recentReturns = [...returns.records].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 5);
@@ -191,40 +183,6 @@ export default function DashboardPage() {
     setChat([]);
   }
 
-  async function analyzeInventory() {
-    if (aiBusy || aiStatus !== "ready" || !inventory.length) return;
-    setAiBusy(true);
-    setAiError("");
-    setAiAnalysis(null);
-    try {
-      const response = await fetch("/api/analytics", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          language,
-          marketSeasonContext,
-          products: inventory.slice(0, 200).map((item) => ({
-            name: item.name,
-            sku: item.sku,
-            stock: item.stock,
-            averageMonthlyDemand: item.averageMonthlyDemand,
-            latestMonth: item.latestMonth,
-            latestUnits: item.latestUnits,
-            change: item.change,
-            monthlySalesHistory: item.monthlySalesHistory,
-          })),
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || t("aiRequestFailed"));
-      setAiAnalysis({ ...result, sourceSignature: inventorySignature });
-    } catch (requestError) {
-      setAiError(requestError.message || t("aiRequestFailed"));
-    } finally {
-      setAiBusy(false);
-    }
-  }
-
   async function loadDemo() {
     if (busy) return;
     if (imports.some((item) => item.isDemo) && !window.confirm(`${t("demoLoaded")} ${t("replaceDemoConfirm")}`)) return;
@@ -303,7 +261,6 @@ export default function DashboardPage() {
   }
 
   const aiReady = aiStatus === "ready";
-  const analysis = aiAnalysis?.sourceSignature === inventorySignature ? aiAnalysis : null;
 
   return (
     <>
@@ -384,7 +341,7 @@ export default function DashboardPage() {
             <motion.aside className="dashboard-side" variants={rise} aria-labelledby="ai-panel-title">
               <Card className="dashboard-panel ai-panel">
                 <div className="ai-head">
-                  <span className={`ai-orb ${aiBusy || chatBusy ? "ai-orb-busy" : ""}`} aria-hidden="true" />
+                  <span className={`ai-orb ${chatBusy ? "ai-orb-busy" : ""}`} aria-hidden="true" />
                   <div>
                     <h2 id="ai-panel-title">{t("aiInventoryTitle")}</h2>
                     <p><span className={`ai-status-dot ${aiReady ? "ai-status-ready" : ""}`} />{aiStatus === "checking" ? t("loading") : aiReady ? "Gemini 3.8 Flash" : t("aiNotConfigured")}</p>
@@ -402,51 +359,6 @@ export default function DashboardPage() {
                     stickToBottom.current = panel.scrollHeight - panel.scrollTop - panel.clientHeight < 120;
                   }}
                 >
-                  <p className="ai-bubble">{t("aiInventoryDescription")}</p>
-                  {aiStatus === "missing" && <p className="ai-setup-note">{t("aiSetupHint")} <code>GEMINI_API_KEY</code> {t("aiSetupHintEnd")}</p>}
-                  {aiStatus === "unavailable" && <p className="ai-error" role="status">{t("aiStatusUnavailable")}</p>}
-                  <h3 className="ai-section-title"><span className="ai-ring" aria-hidden="true" />{t("inventoryAnalyst")}<Badge tone="blue">{t("dataDriven")}</Badge></h3>
-                  {inventory.length ? (
-                    <ul className="ai-points">
-                      {inventory.slice(0, 4).map((item) => (
-                        <li key={item.key}>
-                          <span className={`insight-indicator insight-${item.tone}`} />
-                          <div><strong>{item.name}</strong><p>{item.recommendation}</p>{item.sku && <small>SKU {item.sku}</small>}</div>
-                          {item.change !== null && <Badge tone={item.change > 0 ? "success" : "neutral"}>{item.change > 0 ? "+" : ""}{Math.round(item.change * 100)}%</Badge>}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : <EmptyState title={t("noInventoryData")} description={t("inventoryImportHint")} action={<Link href="/import" className="text-link">{t("importData")}</Link>} />}
-                  <form className="ai-analyze" onSubmit={(event) => { event.preventDefault(); analyzeInventory(); }}>
-                    <input
-                      className="input"
-                      type="text"
-                      maxLength={200}
-                      value={marketSeasonContext}
-                      onChange={(event) => setMarketSeasonContext(event.target.value)}
-                      placeholder={t("marketSeasonPlaceholder")}
-                      aria-label={t("marketSeasonContext")}
-                    />
-                    <Button type="submit" variant="secondary" disabled={!aiReady || aiBusy || !inventory.length}>
-                      {aiBusy ? <LoaderCircle className="spin" size={13} aria-hidden="true" /> : <Sparkles size={13} aria-hidden="true" />}{aiBusy ? t("aiAnalyzing") : t("analyzeWithAi")}
-                    </Button>
-                  </form>
-                  <div className="ai-live" aria-live="polite">
-                    {aiError && <p className="ai-error" role="alert">{aiError}</p>}
-                    {analysis && (
-                      <motion.div className="ai-result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: easeOut }}>
-                        <p className="ai-bubble">{analysis.summary}</p>
-                        {analysis.recommendations.map((recommendation, index) => (
-                          <article className="ai-recommendation" key={`${recommendation.title}-${index}`}>
-                            <div><strong>{recommendation.title}</strong><Badge tone={recommendation.confidence === "high" ? "success" : "neutral"}>{t(`confidence${recommendation.confidence}`)}</Badge></div>
-                            <p>{recommendation.action}</p>
-                            <small>{t("aiEvidence")}: {recommendation.evidence}</small>
-                          </article>
-                        ))}
-                      </motion.div>
-                    )}
-                  </div>
-                  <p className="analysis-disclaimer">{t("inventoryAnalysisDisclaimer")}</p>
                   {/* aria-busy holds the announcement until the whole answer has arrived. */}
                   <div className="ai-chat" role="log" aria-live="polite" aria-busy={chatBusy} aria-label={t("aiInventoryTitle")}>
                     {chat.map((message, index) => (
@@ -465,14 +377,8 @@ export default function DashboardPage() {
                       </motion.div>
                     ))}
                   </div>
-                  {!chat.length && aiReady && hasData && (
-                    <div className="ai-suggestions">
-                      {t("chatSuggestions").map((suggestion) => <button type="button" className="ai-suggestion" key={suggestion} onClick={() => sendChat(suggestion)}>{suggestion}</button>)}
-                    </div>
-                  )}
                 </div>
                 <div className="ai-foot">
-                  <p className="analysis-disclaimer">{t("aiPrivacyDisclaimer")}</p>
                   <form className="ai-composer" onSubmit={(event) => { event.preventDefault(); sendChat(chatInput); }}>
                     <input
                       type="text"
