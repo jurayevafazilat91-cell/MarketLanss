@@ -3,7 +3,7 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { readJsonBody } from "@/lib/gemini";
-import { getMongoStoreCollection } from "@/lib/mongodb";
+import { getStoreSql } from "@/lib/db";
 
 export const runtime = "nodejs";
 const root = process.cwd();
@@ -32,12 +32,10 @@ const schema = z.object({
 });
 
 async function loadStore() {
-  const collection = await getMongoStoreCollection();
-  if (collection) {
-    const saved = await collection.findOne({ _id: "main" });
-    return saved
-      ? { imports: saved.imports, stockOverrides: saved.stockOverrides ?? [], language: saved.language }
-      : { imports: [], stockOverrides: [], language: "en" };
+  const sql = await getStoreSql();
+  if (sql) {
+    const [row] = await sql`select data from app_store where id = 'main'`;
+    return row?.data ?? { imports: [], stockOverrides: [], language: "en" };
   }
 
   try {
@@ -49,9 +47,11 @@ async function loadStore() {
 }
 
 async function saveStore(store) {
-  const collection = await getMongoStoreCollection();
-  if (collection) {
-    await collection.replaceOne({ _id: "main" }, store, { upsert: true });
+  const sql = await getStoreSql();
+  if (sql) {
+    await sql`
+      insert into app_store (id, data) values ('main', ${JSON.stringify(store)}::jsonb)
+      on conflict (id) do update set data = excluded.data, updated_at = now()`;
     return;
   }
 
