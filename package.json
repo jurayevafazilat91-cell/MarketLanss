@@ -14,8 +14,8 @@
   "dependencies": {
     "@e965/xlsx": "^0.20.3",
     "@google/genai": "^3.6.0",
+    "@neondatabase/serverless": "^1.2.1",
     "lucide-react": "^1.68.0",
-    "mongodb": "^7.8.0",
     "motion": "^14.14.0",
     "next": "16.4.5",
     "papaparse": "^5.7.0",
