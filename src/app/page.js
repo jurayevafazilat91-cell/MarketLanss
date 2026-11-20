@@ -389,7 +389,7 @@ export default function DashboardPage() {
                     <h2 id="ai-panel-title">{t("aiInventoryTitle")}</h2>
                     <p><span className={`ai-status-dot ${aiReady ? "ai-status-ready" : ""}`} />{aiStatus === "checking" ? t("loading") : aiReady ? "Gemini 3.8 Flash" : t("aiNotConfigured")}</p>
                   </div>
-                  {chat.length > 0 && <button type="button" className="icon-button ai-head-action" onClick={resetChat} aria-label={t("newChat")} title={t("newChat")}><MessageSquarePlus size={17} aria-hidden="true" /></button>}
+                  {chat.length > 0 && <button type="button" className="icon-button ai-head-action" onClick={resetChat} aria-label={t("newChat")} title={t("newChat")}><MessageSquarePlus size={15} aria-hidden="true" /></button>}
                 </div>
                 <div
                   className="ai-scroll"
@@ -428,7 +428,7 @@ export default function DashboardPage() {
                       aria-label={t("marketSeasonContext")}
                     />
                     <Button type="submit" variant="secondary" disabled={!aiReady || aiBusy || !inventory.length}>
-                      {aiBusy ? <LoaderCircle className="spin" size={15} aria-hidden="true" /> : <Sparkles size={15} aria-hidden="true" />}{aiBusy ? t("aiAnalyzing") : t("analyzeWithAi")}
+                      {aiBusy ? <LoaderCircle className="spin" size={13} aria-hidden="true" /> : <Sparkles size={13} aria-hidden="true" />}{aiBusy ? t("aiAnalyzing") : t("analyzeWithAi")}
                     </Button>
                   </form>
                   <div className="ai-live" aria-live="polite">
@@ -474,7 +474,6 @@ export default function DashboardPage() {
                 <div className="ai-foot">
                   <p className="analysis-disclaimer">{t("aiPrivacyDisclaimer")}</p>
                   <form className="ai-composer" onSubmit={(event) => { event.preventDefault(); sendChat(chatInput); }}>
-                    <span className="ai-composer-icon" aria-hidden="true"><Sparkles size={15} /></span>
                     <input
                       type="text"
                       maxLength={4000}
@@ -486,11 +485,11 @@ export default function DashboardPage() {
                     />
                     {chatBusy ? (
                       <button type="button" className="ai-send" onClick={() => chatAbort.current?.abort()} aria-label={t("chatStop")} title={t("chatStop")}>
-                        <Square size={13} fill="currentColor" aria-hidden="true" />
+                        <Square size={10} fill="currentColor" aria-hidden="true" />
                       </button>
                     ) : (
                       <button type="submit" className="ai-send" disabled={!aiReady || !chatInput.trim()} aria-label={t("chatSend")} title={t("chatSend")}>
-                        <SendHorizontal size={16} aria-hidden="true" />
+                        <SendHorizontal size={13} aria-hidden="true" />
                       </button>
                     )}
                   </form>
