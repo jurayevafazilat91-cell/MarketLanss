@@ -46,7 +46,7 @@ export function AppProvider({ children }) {
   const save = useCallback(async (nextImports, nextLanguage = language, nextStockOverrides = stockOverrides) => {
     const body = JSON.stringify({ imports: nextImports, stockOverrides: nextStockOverrides, language: nextLanguage });
     // shortcut: the whole workspace goes in one request, so it must stay under Vercel's 4.5 MB body limit
-    // (and MongoDB's 16 MB document limit); save each import separately when sellers need bigger data.
+    // (the database takes far more); save each import separately when sellers need bigger data.
     if (new Blob([body]).size > 4_000_000) throw new Error(translate(nextLanguage, "saveTooLarge"));
     const response = await fetch("/api/store", { method: "PUT", headers: { "Content-Type": "application/json" }, body });
     if (response.status === 413) throw new Error(translate(nextLanguage, "saveTooLarge"));

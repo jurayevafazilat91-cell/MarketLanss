@@ -15,13 +15,13 @@ Open `http://localhost:3000`. To create a production build, run `npm run build`,
 
 ## Data storage and environment
 
-By default, the app stores imports and the selected interface language in `data/store.json` through the server-side `/api/store` route. To use MongoDB Atlas instead, copy `.env.example` to `.env.local`, set `MONGODB_URI` to your Atlas connection string, and optionally set `MONGODB_DB` (defaults to `marketplace_intelligence`). When `MONGODB_URI` is set, the app stores the dataset in the `app_store` collection; otherwise it uses the local JSON file. `LOCAL_STORE_PATH` changes the local file location.
+By default, the app stores imports and the selected interface language in `data/store.json` through the server-side `/api/store` route. To use a Neon Postgres database instead (free plan, no card), copy `.env.example` to `.env.local` and set `DATABASE_URL` to the connection string from the Neon console. When `DATABASE_URL` is set, the whole dataset is one JSON row in the `app_store` table, which the app creates on first use; otherwise it uses the local JSON file. `LOCAL_STORE_PATH` changes the local file location.
 
-In Atlas, create a database user with only the `readWrite` role on the app's database (not `atlasAdmin`) and allow network access from the machine running the app, then use the driver's connection string from Atlas. URL-encode special characters in the database user's password. Keep the actual URI in `.env.local`; never commit it or expose it through a `NEXT_PUBLIC_` variable. The `.env*` files are ignored by Git.
+Keep the actual connection string in `.env.local`; never commit it or expose it through a `NEXT_PUBLIC_` variable. The `.env*` files are ignored by Git. On Vercel the file system is read-only, so set `DATABASE_URL` in the project environment variables and redeploy; without it, saves fail.
 
 This MVP stores one shared dataset and has no user accounts or per-user data isolation. `src/proxy.js` guards every page and `/api/store` with one shared password (HTTP Basic Auth): set `APP_PASSWORD` in `.env.local` and in the Vercel project. Locally the app stays open without it; on Vercel it answers 503 until it is set. Do not use it for multiple users until real accounts and access controls are implemented.
 
-The whole workspace is saved in one request, so a save is refused with a clear message above 4 MB (Vercel accepts request bodies up to 4.5 MB, and MongoDB documents up to 16 MB). This fits roughly 10,000 order rows in total.
+The whole workspace is saved in one request, so a save is refused with a clear message above 4 MB (Vercel accepts request bodies up to 4.5 MB). This fits roughly 10,000 order rows in total.
 
 ## Demo and sample files
 
@@ -33,7 +33,7 @@ The generated CSV samples are in `public/samples/` and are downloadable from Hel
 npm run samples
 ```
 
-The Products page combines product/inventory imports with dated order history. It can show cards, rows, or a compact list; product details include weekly, monthly, and yearly unit sales, descriptions, offers, and popularity by yearly sales. Seller-edited stock is saved as a product-keyed override in the same local store (or MongoDB record) as imports. The product sample includes stock, descriptions, and sample promotions; demo order dates roll across the last year so each sales period can be explored.
+The Products page combines product/inventory imports with dated order history. It can show cards, rows, or a compact list; product details include weekly, monthly, and yearly unit sales, descriptions, offers, and popularity by yearly sales. Seller-edited stock is saved as a product-keyed override in the same local store (or database record) as imports. The product sample includes stock, descriptions, and sample promotions; demo order dates roll across the last year so each sales period can be explored.
 
 To change the file used for current inventory, open Settings and choose a CSV or Excel inventory file. The file must have recognizable product-name or SKU and stock-quantity columns, and every row must contain a non-negative whole-number stock quantity. Replacing the inventory source preserves order history and other reports, but removes previous product imports and manual stock edits. Files are parsed in the browser and saved with the local workspace.
 
@@ -64,7 +64,7 @@ npm run build
 
 ## Limitations
 
-- Local JSON and MongoDB Atlas storage in this MVP are for a single-user development/demo deployment; the app has one shared password, not user accounts or multi-user data isolation.
+- Local JSON and Neon Postgres storage in this MVP are for a single-user development/demo deployment; the app has one shared password, not user accounts or multi-user data isolation.
 - Login/register routes explain that authentication is not configured; they do not collect credentials.
 - Currency is not detected or converted. Amounts remain in the source report's units.
 - Matching and return categories are deterministic and depend on the imported fields and marketplace report semantics.
